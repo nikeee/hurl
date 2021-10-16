@@ -1,4 +1,3 @@
-/Users/jc/Documents/Dev/hurl-dev/.venv/bin/python /Users/jc/Documents/Dev/hurl-dev/sites/build_github_readme.py
 
 <a href="https://hurl.dev"><img src="https://raw.githubusercontent.com/Orange-OpenSource/hurl/master/docs/logo.svg?sanitize=true" align="center" width="264px"/></a>
 
@@ -14,7 +13,7 @@
 
 Hurl is a command line tool that runs <b>HTTP requests</b> defined in a simple <b>plain text format</b>.
 
-It can perform requests, capture values and evaluate queries on headers and body response. Hurl is very
+It can perform requests, capture values and evaluate queries on headers and body response. Hurl is very 
 versatile: it can be used for both <b>fetching data</b> and <b>testing HTTP</b> sessions.
 
 
@@ -46,7 +45,7 @@ GET https://api.example.net/step3
 ## Also an HTTP Test Tool
 
 Hurl can run HTTP requests but can also be used to <b>test HTTP responses</b>.
-Different types of queries and predicates are supported, from [XPath] and [JSONPath] on body response,
+Different types of queries and predicates are supported, from [XPath] and [JSONPath] on body response, 
 to assert on status code and response headers.
 
 It is well adapted for <b>REST / JSON apis</b>
@@ -118,23 +117,21 @@ sha256 == hex,039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81;
 ## Why Hurl?
 
 <ul class="showcase-container">
- <li class="showcase-item"><h2 class="showcase-item-title">Text Format</h2>For both devops and developers</li>
- <li class="showcase-item"><h2 class="showcase-item-title">Fast CLI</h2>A command line for local dev and continuous 
-integration</li>
- <li class="showcase-item"><h2 class="showcase-item-title">Single Binary</h2>Easy to install, with no runtime 
-required</li>
+ <li><b>Text Format:</b> for both devops and developers</li>
+ <li><b>Fast CLI:</b> a command line for local dev and continuous integration</li>
+ <li><b>Single Binary:</b> easy to install, with no runtime required</li>
 </ul>
 
 ## Powered by curl
 
-Hurl is a lightweight binary written in [Rust]. Under the hood, Hurl HTTP engine is
-powered by [libcurl], one of the most powerful and reliable file transfer library.
-With its text file format, Hurl adds syntactic sugar to run and tests HTTP requests,
+Hurl is a lightweight binary written in [Rust]. Under the hood, Hurl HTTP engine is 
+powered by [libcurl], one of the most powerful and reliable file transfer library. 
+With its text file format, Hurl adds syntactic sugar to run and tests HTTP requests, 
 but it's still the [curl] that we love.
 
 ## Feedbacks
 
-Hurl file format and runners are still in beta, any [feedback, suggestion, bugs or improvements]
+Hurl file format and runners are still in beta, any [feedback, suggestion, bugs or improvements] 
 are welcome.
 
 ```hurl
@@ -607,7 +604,7 @@ You will need to update your PATH variable.
 
 ##### Installer
 
-<span style="color:red">**!! There is an ongoing [issue](https://github.com/Orange-OpenSource/hurl/issues/267) with current installer [hurl-{{page.hurl-version}}-win64-installer.exe](https://github.com/Orange-OpenSource/hurl/releases/download/{{page.hurl-version}}/hurl-{{page.hurl-version}}-win64-installer.exe)
+<span style="color:red">**!! There is an ongoing [issue](https://github.com/Orange-OpenSource/hurl/issues/267) with current installer [hurl-{{page.hurl-version}}-win64-installer.exe](https://github.com/Orange-OpenSource/hurl/releases/download/{{page.hurl-version}}/hurl-{{page.hurl-version}}-win64-installer.exe) 
 for environment with PATH greater tham 1MB. You should probably save your PATH in this case !!**</span>
 
 It should be fixed in the next release.
@@ -642,7 +639,7 @@ pacman -Sy --noconfirm pkgconf gcc openssl libxml2
 brew install pkg-config gcc openssl libxml2
 ```
 
-Hurl is written in [Rust](https://www.rust-lang.org/). You should [install](https://www.rust-lang.org/tools/install)
+Hurl is written in [Rust](https://www.rust-lang.org/). You should [install](https://www.rust-lang.org/tools/install) 
 the latest stable release.
 
 ```shell
@@ -786,9 +783,9 @@ file,data.json;
 
 Using templates with [JSON body](https://hurl.dev/docs/request.md %}#json-body) or [XML body]({% link _docs/request.html#xml
 -body)
-is not currently supported in Hurl. Besides, you can use templates in [raw string body](https://hurl.dev/docs/request.html#raw
--string-body) with variables to send a JSON or XML body:
-
+ is not currently supported in Hurl. Besides, you can use templates in [raw string body](https://hurl.dev/docs/request.html#raw
+ -string-body) with variables to send a JSON or XML body:
+ 
 
 ~~~hurl
 PUT https://api.example.net/hits
@@ -1003,5 +1000,3 @@ bytes startsWith hex,efbbbf;
 
 
 
-
-Process finished with exit code 0
