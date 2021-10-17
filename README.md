@@ -156,17 +156,17 @@ HTTP/1.1 200
 # Usage
 
 ## {{ page.title }}
-### NAME
+### Name
 
 hurl - run and test HTTP requests.
 
 
-### SYNOPSIS
+### Synopsis
 
 **hurl** [options] [FILE...]
 
 
-### DESCRIPTION
+### Description
 
 **Hurl** is an HTTP client that performs HTTP requests defined in a simple plain text format.
 
@@ -214,7 +214,7 @@ By default, Hurl executes all HTTP requests and outputs the response body of the
 
 
 
-### HURL FILE FORMAT
+### Hurl File Format
 
 The Hurl file format is fully documented in [https://hurl.dev/docs/hurl-file.html](https://hurl.dev/docs/hurl-file.html)
 
@@ -287,7 +287,7 @@ Thanks to asserts, Hurl can be used as a testing tool to run scenarii.
 
 
 
-### OPTIONS
+### Options
 
 Options that exist in curl have exactly the same semantic.
 
@@ -485,7 +485,7 @@ Prints version information
 
 
 
-### ENVIRONMENT
+### Environment
 
 Environment variables can only be specified in lowercase.
 
@@ -511,7 +511,7 @@ Sets the proxy server to use if no protocol-specific proxy is set.
 list of host names that shouldn't go through any proxy.
 
 
-### EXIT CODES
+### Exit Codes
 
 #### 1
 Failed to parse command-line options.
@@ -535,7 +535,7 @@ Assert Error.
 [https://hurl.dev](https://hurl.dev)
 
 
-### SEE ALSO
+### See Also
 
 curl(1)  hurlfmt(1)
 
