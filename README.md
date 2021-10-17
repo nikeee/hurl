@@ -999,4 +999,18 @@ bytes startsWith hex,efbbbf;
 [Doc](https://hurl.dev/docs/asserting-response.html#bytes-assert)
 
 
+[XPath]: https://en.wikipedia.org/wiki/XPath
+[JSONPath]: https://goessner.net/articles/JsonPath/
+[Rust]: https://www.rust-lang.org
+[curl]: https://curl.se
+[the installation section]: https://hurl.dev/docs/installation.html
+[feedback, suggestion, bugs or improvements]: https://github.com/Orange-OpenSource/hurl/issues
+[License]: https://hurl.dev/docs/license.html
+[Documentation]: https://hurl.dev/docs/man-page.html
+[GitHub]: https://github.com/Orange-OpenSource/hurl
+[libcurl]: https://curl.se/libcurl/
+
+
+
+
 
