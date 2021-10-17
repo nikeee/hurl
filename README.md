@@ -156,17 +156,17 @@ HTTP/1.1 200
 # Usage
 
 ## {{ page.title }}
-### NAME {#name}
+### NAME
 
 hurl - run and test HTTP requests.
 
 
-### SYNOPSIS {#synopsis}
+### SYNOPSIS
 
 **hurl** [options] [FILE...]
 
 
-### DESCRIPTION {#description}
+### DESCRIPTION
 
 **Hurl** is an HTTP client that performs HTTP requests defined in a simple plain text format.
 
@@ -214,7 +214,7 @@ By default, Hurl executes all HTTP requests and outputs the response body of the
 
 
 
-### HURL FILE FORMAT {#hurl-file-format}
+### HURL FILE FORMAT
 
 The Hurl file format is fully documented in [https://hurl.dev/docs/hurl-file.html](https://hurl.dev/docs/hurl-file.html)
 
@@ -287,15 +287,9 @@ Thanks to asserts, Hurl can be used as a testing tool to run scenarii.
 
 
 
-### OPTIONS {#options}
+### OPTIONS
 
 Options that exist in curl have exactly the same semantic.
-
-
-#### \-\-append {#append}
-
-This option can only be used with [\-\-json](#json). It appends sessions to existing file instead of overwriting it.
-This is typically used in a CI pipeline.
 
 
 #### \-\-color {#color}
@@ -360,8 +354,12 @@ Usage help. This lists all current command line options with a short description
 
 Generate html report in dir.
 
-If you want to combine results from different Hurl executions in a unique html report, you must also use the options [\-\-json](#json) and [\-\-append](#append).
+If the html report already exists, it will be updated with the new test results.
 
+
+#### \-\-ignore-asserts {#ignore-asserts}
+
+Ignore all asserts defined in the Hurl file.
 
 
 #### -i, \-\-include {#include}
@@ -379,10 +377,7 @@ This is similar to a break point, You can then continue (Press C) or quit (Press
 
 Write full session(s) to a json file. The format is very closed to HAR format.
 
-By default, this file is overwritten by the current run execution.
-In order to append sessions to an existing json file, the option [\-\-append](#append) must be used.
-This is typically used in a CI pipeline.
-
+If the json file already exists, the file will be updated with the new test results.
 
 
 #### -k, \-\-insecure {#insecure}
@@ -490,7 +485,7 @@ Prints version information
 
 
 
-### ENVIRONMENT {#environment}
+### ENVIRONMENT
 
 Environment variables can only be specified in lowercase.
 
@@ -516,7 +511,7 @@ Sets the proxy server to use if no protocol-specific proxy is set.
 list of host names that shouldn't go through any proxy.
 
 
-### EXIT CODES {#exit-codes}
+### EXIT CODES
 
 #### 1
 Failed to parse command-line options.
@@ -535,12 +530,12 @@ Assert Error.
 
 
 
-### WWW {#www}
+### WWW
 
 [https://hurl.dev](https://hurl.dev)
 
 
-### SEE ALSO {#see-also}
+### SEE ALSO
 
 curl(1)  hurlfmt(1)
 
