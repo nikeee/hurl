@@ -16,9 +16,12 @@
  *
  */
 use std::time::Duration;
+use std::io::Read;
+
+use crate::runner::{DirectoryContext, FsDirectoryContext};
 
 #[derive(Debug, Clone)]
-pub struct ClientOptions {
+pub struct ClientOptions<R: Read, D: DirectoryContext<R>> {
     pub follow_location: bool,
     pub max_redirect: Option<usize>,
     pub cookie_input_file: Option<String>,
@@ -30,10 +33,11 @@ pub struct ClientOptions {
     pub connect_timeout: Duration,
     pub user: Option<String>,
     pub compressed: bool,
-    pub context_dir: String,
+    pub context_dir: D, // TODO: Option<D>`?
+    pub resource_type: std::marker::PhantomData<R>,
 }
 
-impl Default for ClientOptions {
+impl Default for ClientOptions<std::fs::File, FsDirectoryContext<std::fs::File>> {
     fn default() -> Self {
         ClientOptions {
             follow_location: false,
@@ -47,12 +51,13 @@ impl Default for ClientOptions {
             connect_timeout: Duration::new(300, 0),
             user: None,
             compressed: false,
-            context_dir: ".".to_string(),
+            context_dir: FsDirectoryContext::new(".".to_string()),
+            resource_type: std::marker::PhantomData,
         }
     }
 }
 
-impl ClientOptions {
+impl<R: Read, D: DirectoryContext<R>> ClientOptions<R, D> {
     pub fn curl_args(&self) -> Vec<String> {
         let mut arguments = vec![];
 

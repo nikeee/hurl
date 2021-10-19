@@ -17,12 +17,14 @@
  */
 use std::collections::HashMap;
 use std::time::Instant;
+use std::io::Read;
 
 use crate::http;
 use hurl_core::ast::*;
 
 use super::core::*;
 use super::entry;
+use crate::runner::DirectoryContext;
 
 /// Run a Hurl file with the hurl http client
 ///
@@ -89,11 +91,11 @@ use super::entry;
 ///
 /// ```
 ///
-pub fn run(
+pub fn run<R: Read, D: DirectoryContext<R>>(
     hurl_file: HurlFile,
-    http_client: &mut http::Client,
+    http_client: &mut http::Client<R, D>,
     filename: String,
-    options: &RunnerOptions,
+    options: &RunnerOptions<R, D>,
     log_verbose: &impl Fn(&str),
     log_error_message: &impl Fn(bool, &str),
     log_error: &impl Fn(&Error, bool),

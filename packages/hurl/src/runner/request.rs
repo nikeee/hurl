@@ -31,11 +31,12 @@ use super::core::Error;
 use super::template::eval_template;
 use super::value::Value;
 use crate::runner::multipart::eval_multipart_param;
+use crate::runner::DirectoryContext;
 
-pub fn eval_request(
+pub fn eval_request<R: Read, D: DirectoryContext<R>>(
     request: Request,
     variables: &HashMap<String, Value>,
-    context_dir: String,
+    context_dir: &D,
 ) -> Result<http::RequestSpec, Error> {
     let method = eval_method(request.method.clone());
 
@@ -79,13 +80,13 @@ pub fn eval_request(
     }
 
     let body = match request.clone().body {
-        Some(body) => eval_body(body, variables, context_dir.clone())?,
+        Some(body) => eval_body(body, variables, context_dir)?,
         None => http::Body::Binary(vec![]),
     };
 
     let mut multipart = vec![];
     for multipart_param in request.clone().multipart_form_data() {
-        let param = eval_multipart_param(multipart_param, variables, context_dir.clone())?;
+        let param = eval_multipart_param(multipart_param, variables, context_dir)?;
         multipart.push(param);
     }
 

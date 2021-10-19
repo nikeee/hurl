@@ -27,12 +27,13 @@ use super::core::*;
 use super::json::eval_json_value;
 use super::template::eval_template;
 use super::value::Value;
+use crate::runner::DirectoryContext;
 
-pub fn eval_asserts(
+pub fn eval_asserts<R: std::io::Read, D: DirectoryContext<R>>(
     response: Response,
     variables: &HashMap<String, Value>,
     http_response: http::Response,
-    context_dir: String,
+    context_dir: &D,
 ) -> Vec<AssertResult> {
     let mut asserts = vec![];
 

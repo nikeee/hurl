@@ -18,19 +18,21 @@
 use std::collections::HashMap;
 
 use crate::http;
+use crate::runner::DirectoryContext;
 use hurl_core::ast::SourceInfo;
 
 use super::value::Value;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct RunnerOptions {
+pub struct RunnerOptions<R: std::io::Read, D: DirectoryContext<R>> {
     pub fail_fast: bool,
     pub variables: HashMap<String, Value>,
     pub to_entry: Option<usize>,
-    pub context_dir: String,
+    pub context_dir: D,
     pub ignore_asserts: bool,
     pub pre_entry: fn() -> bool,
     pub post_entry: fn() -> bool,
+    pub resource_type: std::marker::PhantomData<R>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

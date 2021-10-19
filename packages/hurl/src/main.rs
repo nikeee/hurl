@@ -30,7 +30,7 @@ use hurl::http;
 use hurl::json;
 use hurl::report;
 use hurl::runner;
-use hurl::runner::{HurlResult, RunnerOptions};
+use hurl::runner::{HurlResult, RunnerOptions, FsDirectoryContext};
 use hurl_core::ast::{Pos, SourceInfo};
 use hurl_core::error::Error;
 use hurl_core::parser;
@@ -172,6 +172,7 @@ fn execute(
                 }
                 Some(filename) => filename,
             };
+
             let options = http::ClientOptions {
                 follow_location,
                 max_redirect,
@@ -184,7 +185,8 @@ fn execute(
                 connect_timeout,
                 user,
                 compressed,
-                context_dir: context_dir.clone(),
+                context_dir: FsDirectoryContext::new(context_dir.clone()),
+                resource_type: std::marker::PhantomData,
             };
 
             let mut client = http::Client::init(options);
@@ -203,10 +205,11 @@ fn execute(
                 fail_fast: cli_options.fail_fast,
                 variables: cli_options.variables,
                 to_entry: cli_options.to_entry,
-                context_dir,
+                context_dir: FsDirectoryContext::new(context_dir.clone()),
                 ignore_asserts: cli_options.ignore_asserts,
                 pre_entry,
                 post_entry,
+                resource_type: std::marker::PhantomData,
             };
             let result = runner::run_hurl_file(
                 hurl_file,

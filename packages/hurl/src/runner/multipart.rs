@@ -19,12 +19,12 @@ extern crate libxml;
 
 use std::collections::HashMap;
 use std::ffi::OsStr;
-use std::fs::File;
 #[allow(unused)]
 use std::io::prelude::*;
 use std::io::Read;
 use std::path::Path;
 
+use crate::runner::DirectoryContext;
 use crate::http;
 use hurl_core::ast::*;
 
@@ -32,10 +32,10 @@ use super::core::{Error, RunnerError};
 use super::template::eval_template;
 use super::value::Value;
 
-pub fn eval_multipart_param(
+pub fn eval_multipart_param<R: Read, D: DirectoryContext<R>>(
     multipart_param: MultipartParam,
     variables: &HashMap<String, Value>,
-    context_dir: String,
+    context_dir: &D,
 ) -> Result<http::MultipartParam, Error> {
     match multipart_param {
         MultipartParam::Param(KeyValue { key, value, .. }) => {
@@ -50,34 +50,24 @@ pub fn eval_multipart_param(
     }
 }
 
-pub fn eval_file_param(
+pub fn eval_file_param<R: Read, D: DirectoryContext<R>>(
     file_param: FileParam,
-    context_dir: String,
+    context_dir: &D,
 ) -> Result<http::FileParam, Error> {
     let name = file_param.key.value;
 
     let filename = file_param.value.filename.clone();
-    let path = Path::new(filename.value.as_str());
-    let absolute_filename = if path.is_absolute() {
-        filename.value.clone()
-    } else {
-        Path::new(context_dir.as_str())
-            .join(filename.value.clone())
-            .to_str()
-            .unwrap()
-            .to_string()
-    };
 
-    let data = match File::open(absolute_filename.clone()) {
+    let data = match context_dir.open(&filename) {
         Ok(mut f) => {
             let mut bytes = Vec::new();
             match f.read_to_end(&mut bytes) {
                 Ok(_) => bytes,
                 Err(_) => {
                     return Err(Error {
-                        source_info: filename.source_info,
+                        source_info: filename.source_info.clone(),
                         inner: RunnerError::FileReadAccess {
-                            value: absolute_filename,
+                            value: context_dir.get_absolute_filename(&filename),
                         },
                         assert: false,
                     });
@@ -86,16 +76,16 @@ pub fn eval_file_param(
         }
         Err(_) => {
             return Err(Error {
-                source_info: filename.source_info,
+                source_info: filename.source_info.clone(),
                 inner: RunnerError::FileReadAccess {
-                    value: absolute_filename,
+                    value: context_dir.get_absolute_filename(&filename),
                 },
                 assert: false,
             });
         }
     };
 
-    if !Path::new(&absolute_filename).exists() {
+    if !context_dir.exists(&filename) {
         return Err(Error {
             source_info: filename.source_info,
             inner: RunnerError::FileReadAccess {

@@ -17,7 +17,7 @@
  */
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::io::Read;
 
 use hurl_core::ast::*;
 
@@ -26,19 +26,20 @@ use super::json::eval_json_value;
 use super::template::eval_template;
 use super::value::Value;
 use crate::http;
+use crate::runner::DirectoryContext;
 
-pub fn eval_body(
+pub fn eval_body<R: Read, D: DirectoryContext<R>>(
     body: Body,
     variables: &HashMap<String, Value>,
-    context_dir: String,
+    context_dir: &D,
 ) -> Result<http::Body, Error> {
     eval_bytes(body.value, variables, context_dir)
 }
 
-pub fn eval_bytes(
+pub fn eval_bytes<R: Read, D: DirectoryContext<R>>(
     bytes: Bytes,
     variables: &HashMap<String, Value>,
-    context_dir: String,
+    context_dir: &D,
 ) -> Result<http::Body, Error> {
     match bytes {
         // Body::Text
@@ -55,23 +56,18 @@ pub fn eval_bytes(
         Bytes::Base64(Base64 { value, .. }) => Ok(http::Body::Binary(value)),
         Bytes::Hex(Hex { value, .. }) => Ok(http::Body::Binary(value)),
         Bytes::File(File { filename, .. }) => {
-            let f = filename.value.as_str();
-            let path = Path::new(f);
-            let absolute_filename = if path.is_absolute() {
-                filename.clone().value
-            } else {
-                Path::new(context_dir.as_str())
-                    .join(f)
-                    .to_str()
-                    .unwrap()
-                    .to_string()
-            };
-            match std::fs::read(absolute_filename.clone()) {
-                Ok(value) => Ok(http::Body::File(value, f.to_string())),
+            match context_dir.open(&filename) {
+                Ok(mut file) => {
+
+                    let mut body_contents = Vec::new();
+                    file.read_to_end(&mut body_contents).unwrap();
+
+                    Ok(http::Body::File(body_contents, filename.value))
+                },
                 Err(_) => Err(Error {
-                    source_info: filename.source_info,
+                    source_info: filename.source_info.clone(),
                     inner: RunnerError::FileReadAccess {
-                        value: absolute_filename,
+                        value: context_dir.get_absolute_filename(&filename),
                     },
                     assert: false,
                 }),

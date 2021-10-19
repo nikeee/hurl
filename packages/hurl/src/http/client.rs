@@ -30,6 +30,7 @@ use super::request_spec::*;
 use super::response::*;
 use std::str::FromStr;
 use url::Url;
+use crate::runner::DirectoryContext;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum HttpError {
@@ -46,8 +47,8 @@ pub enum HttpError {
 }
 
 #[derive(Debug)]
-pub struct Client {
-    pub options: ClientOptions,
+pub struct Client<R: Read, D: DirectoryContext<R>> {
+    pub options: ClientOptions<R, D>,
     pub handle: Box<easy::Easy>,
     pub redirect_count: usize,
     // unfortunately, follow-location feature from libcurl can not be used
@@ -55,11 +56,11 @@ pub struct Client {
     // hurl needs to keep everything
 }
 
-impl Client {
+impl<R: Read, D: DirectoryContext<R>> Client<R, D> {
     ///
     /// Init HTTP hurl client
     ///
-    pub fn init(options: ClientOptions) -> Client {
+    pub fn init(options: ClientOptions<R, D>) -> Client<R, D> {
         let mut h = easy::Easy::new();
 
         // Set handle attributes
@@ -522,7 +523,7 @@ impl Client {
     ///
     pub fn curl_command_line(&mut self, http_request: &RequestSpec) -> String {
         let mut arguments = vec!["curl".to_string()];
-        arguments.append(&mut http_request.curl_args(self.options.context_dir.clone()));
+        // arguments.append(&mut http_request.curl_args(self.options.context_dir.clone()));
 
         let cookies = all_cookies(self.get_cookie_storage(), http_request);
         if !cookies.is_empty() {
