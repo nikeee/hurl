@@ -29,6 +29,7 @@ pub use self::core::{
 };
 pub use self::hurl_file::run as run_hurl_file;
 pub use self::value::Value;
+pub use self::fs_context::{DirectoryContext, FsDirectoryContext};
 
 mod assert;
 mod body;
@@ -39,6 +40,7 @@ mod core;
 mod entry;
 mod error;
 mod expr;
+mod fs_context;
 mod http_response;
 mod hurl_file;
 mod json;
