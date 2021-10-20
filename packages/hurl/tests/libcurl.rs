@@ -616,7 +616,7 @@ fn test_basic_authentication() {
         content_type: None,
     };
     assert_eq!(
-        request_spec.curl_args(".".to_string()),
+        request_spec.curl_args(&FsDirectoryContext::new(".".to_string())),
         vec!["'http://bob:secret@localhost:8000/basic-authentication'".to_string()]
     );
     let (request, response) = client.execute(&request_spec).unwrap();

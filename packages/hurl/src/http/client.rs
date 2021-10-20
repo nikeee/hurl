@@ -523,7 +523,7 @@ impl<R: Read, D: DirectoryContext<R>> Client<R, D> {
     ///
     pub fn curl_command_line(&mut self, http_request: &RequestSpec) -> String {
         let mut arguments = vec!["curl".to_string()];
-        // arguments.append(&mut http_request.curl_args(self.options.context_dir.clone()));
+        arguments.append(&mut http_request.curl_args(&self.options.context_dir));
 
         let cookies = all_cookies(self.get_cookie_storage(), http_request);
         if !cookies.is_empty() {

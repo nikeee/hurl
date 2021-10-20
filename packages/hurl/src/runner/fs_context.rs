@@ -8,6 +8,7 @@ pub trait DirectoryContext<R: Read> {
     fn exists(&self, filename: &Filename) -> bool;
     fn open(&self, filename: &Filename) -> Result<R>;
     fn get_absolute_filename(&self, filename: &Filename) -> String;
+    fn get_curl_arg(&self) -> String;
 }
 
 #[derive(Debug, Clone)]
@@ -51,5 +52,9 @@ impl<R: Read> DirectoryContext<File> for FsDirectoryContext<R> {
                 .unwrap()
                 .to_string()
         }
+    }
+
+    fn get_curl_arg(&self) -> String {
+        self.base_dir.clone()
     }
 }
