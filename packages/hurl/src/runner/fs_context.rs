@@ -35,7 +35,7 @@ impl<R: Read> DirectoryContext<File> for FsDirectoryContext<R> {
     fn open(&self, filename: &Filename) -> Result<File> {
         let absolute_filename = self.get_absolute_filename(filename);
 
-        File::open(absolute_filename.clone())
+        File::open(absolute_filename)
     }
 
     fn get_absolute_filename(&self, filename: &Filename) -> String {

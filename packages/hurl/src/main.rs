@@ -205,7 +205,7 @@ fn execute(
                 fail_fast: cli_options.fail_fast,
                 variables: cli_options.variables,
                 to_entry: cli_options.to_entry,
-                context_dir: FsDirectoryContext::new(context_dir.clone()),
+                context_dir: FsDirectoryContext::new(context_dir),
                 ignore_asserts: cli_options.ignore_asserts,
                 pre_entry,
                 post_entry,

@@ -89,7 +89,7 @@ pub fn eval_file_param<R: Read, D: DirectoryContext<R>>(
         return Err(Error {
             source_info: filename.source_info,
             inner: RunnerError::FileReadAccess {
-                value: filename.value.clone(),
+                value: filename.value,
             },
             assert: false,
         });
