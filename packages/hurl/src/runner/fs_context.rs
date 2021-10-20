@@ -4,7 +4,7 @@ use std::path::Path;
 
 use hurl_core::ast::Filename;
 
-pub trait DirectoryContext<R: Read> /* : Clone */ {
+pub trait DirectoryContext<R: Read> {
     fn exists(&self, filename: &Filename) -> bool;
     fn open(&self, filename: &Filename) -> Result<R>;
     fn get_absolute_filename(&self, filename: &Filename) -> String;
