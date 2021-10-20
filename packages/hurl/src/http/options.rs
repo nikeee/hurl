@@ -126,7 +126,8 @@ mod tests {
                 connect_timeout: Duration::new(20, 0),
                 user: Some("user:password".to_string()),
                 compressed: true,
-                context_dir: "".to_string()
+                context_dir: FsDirectoryContext::new("".to_string()),
+                resource_type: std::marker::PhantomData,
             }
             .curl_args(),
             [

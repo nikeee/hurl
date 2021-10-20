@@ -195,6 +195,7 @@ mod tests {
     use hurl_core::ast::SourceInfo;
 
     use super::super::core::RunnerError;
+    use super::super::FsDirectoryContext;
     use super::*;
 
     pub fn whitespace() -> Whitespace {
@@ -331,7 +332,7 @@ mod tests {
     #[test]
     pub fn test_error_variable() {
         let variables = HashMap::new();
-        let error = eval_request(hello_request(), &variables, "current_dir".to_string())
+        let error = eval_request(hello_request(), &variables, &FsDirectoryContext::new("current_dir".to_string()))
             .err()
             .unwrap();
         assert_eq!(error.source_info, SourceInfo::init(1, 7, 1, 15));
@@ -351,7 +352,7 @@ mod tests {
             Value::String(String::from("http://localhost:8000")),
         );
         let http_request =
-            eval_request(hello_request(), &variables, "current_dir".to_string()).unwrap();
+            eval_request(hello_request(), &variables, &FsDirectoryContext::new("current_dir".to_string())).unwrap();
         assert_eq!(http_request, http::hello_http_request());
     }
 
@@ -363,7 +364,7 @@ mod tests {
             Value::String(String::from("value1")),
         );
         let http_request =
-            eval_request(query_request(), &variables, "current_dir".to_string()).unwrap();
+            eval_request(query_request(), &variables, &FsDirectoryContext::new("current_dir".to_string())).unwrap();
         assert_eq!(http_request, http::query_http_request());
     }
 

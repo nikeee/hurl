@@ -81,6 +81,7 @@ mod tests {
     use hurl_core::ast::SourceInfo;
 
     use super::*;
+    use super::super::FsDirectoryContext;
 
     #[test]
     pub fn test_body_file() {
@@ -101,7 +102,7 @@ mod tests {
 
         let variables = HashMap::new();
         assert_eq!(
-            eval_bytes(bytes, &variables, ".".to_string()).unwrap(),
+            eval_bytes(bytes, &variables, &FsDirectoryContext::new(".".to_string())).unwrap(),
             http::Body::File(b"Hello World!".to_vec(), "tests/data.bin".to_string())
         );
     }
@@ -126,7 +127,7 @@ mod tests {
         let variables = HashMap::new();
 
         let separator = if cfg!(windows) { "\\" } else { "/" };
-        let error = eval_bytes(bytes, &variables, "current_dir".to_string())
+        let error = eval_bytes(bytes, &variables, &FsDirectoryContext::new("current_dir".to_string()))
             .err()
             .unwrap();
         assert_eq!(

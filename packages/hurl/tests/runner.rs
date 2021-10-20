@@ -21,6 +21,7 @@ use hurl::cli;
 use hurl::http;
 use hurl::runner;
 use hurl::runner::RunnerOptions;
+use hurl::runner::FsDirectoryContext;
 use hurl_core::ast::*;
 use hurl_core::parser;
 use std::collections::HashMap;
@@ -54,7 +55,8 @@ fn test_hurl_file() {
         connect_timeout: Default::default(),
         user: None,
         compressed: false,
-        context_dir: ".".to_string(),
+        context_dir: FsDirectoryContext::new(".".to_string()),
+        resource_type: std::marker::PhantomData,
     };
     let mut client = http::Client::init(options);
     let mut lines: Vec<&str> = regex::Regex::new(r"\n|\r\n")
@@ -68,7 +70,8 @@ fn test_hurl_file() {
         fail_fast: false,
         variables,
         to_entry: None,
-        context_dir: "current_dir".to_string(),
+        context_dir: FsDirectoryContext::new("current_dir".to_string()),
+        resource_type: std::marker::PhantomData,
         ignore_asserts: false,
         pre_entry: || true,
         post_entry: || true,
@@ -166,7 +169,8 @@ fn test_hello() {
         connect_timeout: Default::default(),
         user: None,
         compressed: false,
-        context_dir: ".".to_string(),
+        context_dir: FsDirectoryContext::new(".".to_string()),
+        resource_type: std::marker::PhantomData,
     };
     let mut client = http::Client::init(options);
     let source_info = SourceInfo {
@@ -211,7 +215,8 @@ fn test_hello() {
         fail_fast: true,
         variables,
         to_entry: None,
-        context_dir: "current_dir".to_string(),
+        context_dir: FsDirectoryContext::new("current_dir".to_string()),
+        resource_type: std::marker::PhantomData,
         ignore_asserts: false,
         pre_entry: || true,
         post_entry: || true,

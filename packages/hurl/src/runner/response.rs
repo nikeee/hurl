@@ -240,6 +240,7 @@ pub fn eval_captures(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::FsDirectoryContext;
 
     use self::super::super::assert;
     use self::super::super::capture;
@@ -293,13 +294,13 @@ mod tests {
     #[test]
     pub fn test_eval_asserts() {
         let variables = HashMap::new();
-        let context_dir = "undefined".to_string();
+        let context_dir = FsDirectoryContext::new("undefined".to_string());
         assert_eq!(
             eval_asserts(
                 user_response(),
                 &variables,
                 http::xml_two_users_http_response(),
-                context_dir,
+                &context_dir,
             ),
             vec![
                 AssertResult::Version {

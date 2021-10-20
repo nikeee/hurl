@@ -131,6 +131,7 @@ mod tests {
     use hurl_core::ast::SourceInfo;
 
     use super::*;
+    use super::super::FsDirectoryContext;
 
     pub fn whitespace() -> Whitespace {
         Whitespace {
@@ -171,7 +172,7 @@ mod tests {
                     },
                     line_terminator0: line_terminator,
                 },
-                "tests".to_string()
+                &FsDirectoryContext::new("tests".to_string()),
             )
             .unwrap(),
             http::FileParam {
