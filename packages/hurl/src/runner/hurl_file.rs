@@ -34,6 +34,7 @@ use crate::runner::DirectoryContext;
 /// use hurl_core::parser;
 /// use hurl::http;
 /// use hurl::runner;
+/// use hurl::runner::FsDirectoryContext;
 ///
 /// // Parse Hurl file
 /// let filename = "sample.hurl".to_string();
@@ -61,7 +62,8 @@ use crate::runner::DirectoryContext;
 ///        connect_timeout: Default::default(),
 ///        user: None,
 ///        compressed: false,
-///        context_dir: "".to_string(),
+///        context_dir: FsDirectoryContext::new("".to_string()),
+///        resource_type: std::marker::PhantomData,
 /// };
 /// let mut client = http::Client::init(options);
 ///
@@ -71,7 +73,7 @@ use crate::runner::DirectoryContext;
 ///        fail_fast: false,
 ///        variables,
 ///        to_entry: None,
-///        context_dir: "current_dir".to_string(),
+///        context_dir: FsDirectoryContext::new("current_dir".to_string()),
 ///        ignore_asserts: false,
 ///        pre_entry: || true,
 ///        post_entry: || true,
