@@ -64,9 +64,9 @@ pub fn eval_bytes(
                     file_contents.read_to_end(&mut body_contents).unwrap();
 
                     Ok(http::Body::File(body_contents, filename.value))
-                },
+                }
                 Err(_) => Err(Error {
-                    source_info: filename.source_info.clone(),
+                    source_info: filename.source_info,
                     inner: RunnerError::FileReadAccess {
                         value: file_to_open.as_str().to_string(),
                     },
