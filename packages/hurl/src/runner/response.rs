@@ -16,6 +16,7 @@
  *
  */
 use std::collections::HashMap;
+use vfs::VfsPath;
 
 use crate::http;
 use hurl_core::ast::*;
@@ -27,13 +28,12 @@ use super::core::*;
 use super::json::eval_json_value;
 use super::template::eval_template;
 use super::value::Value;
-use crate::runner::DirectoryContext;
 
-pub fn eval_asserts<R: std::io::Read, D: DirectoryContext<R>>(
+pub fn eval_asserts(
     response: Response,
     variables: &HashMap<String, Value>,
     http_response: http::Response,
-    context_dir: &D,
+    context_dir: &VfsPath,
 ) -> Vec<AssertResult> {
     let mut asserts = vec![];
 
@@ -239,8 +239,9 @@ pub fn eval_captures(
 
 #[cfg(test)]
 mod tests {
-    use super::super::FsDirectoryContext;
     use super::*;
+    use std::path::PathBuf;
+    use vfs::PhysicalFS;
 
     use self::super::super::assert;
     use self::super::super::capture;
@@ -294,7 +295,7 @@ mod tests {
     #[test]
     pub fn test_eval_asserts() {
         let variables = HashMap::new();
-        let context_dir = FsDirectoryContext::new("undefined".to_string());
+        let context_dir = PhysicalFS::new(PathBuf::from("undefined")).into();
         assert_eq!(
             eval_asserts(
                 user_response(),

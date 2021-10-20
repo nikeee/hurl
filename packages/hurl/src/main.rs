@@ -24,13 +24,15 @@ use std::time::Instant;
 use atty::Stream;
 use colored::*;
 
+use vfs::PhysicalFS;
+
 use hurl::cli;
 use hurl::cli::{CliError, CliOptions};
 use hurl::http;
 use hurl::json;
 use hurl::report;
 use hurl::runner;
-use hurl::runner::{FsDirectoryContext, HurlResult, RunnerOptions};
+use hurl::runner::{HurlResult, RunnerOptions};
 use hurl_core::ast::{Pos, SourceInfo};
 use hurl_core::error::Error;
 use hurl_core::parser;
@@ -185,8 +187,7 @@ fn execute(
                 connect_timeout,
                 user,
                 compressed,
-                context_dir: FsDirectoryContext::new(context_dir.clone()),
-                resource_type: std::marker::PhantomData,
+                context_dir: PhysicalFS::new(PathBuf::from(context_dir.clone())).into(),
             };
 
             let mut client = http::Client::init(options);
@@ -205,11 +206,10 @@ fn execute(
                 fail_fast: cli_options.fail_fast,
                 variables: cli_options.variables,
                 to_entry: cli_options.to_entry,
-                context_dir: FsDirectoryContext::new(context_dir),
+                context_dir: PhysicalFS::new(PathBuf::from(context_dir)).into(),
                 ignore_asserts: cli_options.ignore_asserts,
                 pre_entry,
                 post_entry,
-                resource_type: std::marker::PhantomData,
             };
             let result = runner::run_hurl_file(
                 hurl_file,

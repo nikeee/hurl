@@ -1,8 +1,8 @@
-use std::fs::File;
 use std::time::Duration;
 
 use hurl::http::*;
-use hurl::runner::FsDirectoryContext;
+use std::path::PathBuf;
+use vfs::PhysicalFS;
 
 pub fn new_header(name: &str, value: &str) -> Header {
     Header {
@@ -11,7 +11,7 @@ pub fn new_header(name: &str, value: &str) -> Header {
     }
 }
 
-fn default_client() -> Client<File, FsDirectoryContext<File>> {
+fn default_client() -> Client {
     let options = ClientOptions::default();
     Client::init(options)
 }
@@ -354,8 +354,7 @@ fn test_follow_location() {
         connect_timeout: Duration::new(300, 0),
         user: None,
         compressed: false,
-        context_dir: FsDirectoryContext::new(".".to_string()),
-        resource_type: std::marker::PhantomData,
+        context_dir: PhysicalFS::new(PathBuf::from(".")).into(),
     };
     let mut client = Client::init(options);
     assert_eq!(client.options.curl_args(), vec!["-L".to_string(),]);
@@ -408,8 +407,7 @@ fn test_max_redirect() {
         connect_timeout: Duration::new(300, 0),
         user: None,
         compressed: false,
-        context_dir: FsDirectoryContext::new(".".to_string()),
-        resource_type: std::marker::PhantomData,
+        context_dir: PhysicalFS::new(PathBuf::from(".")).into(),
     };
     let mut client = Client::init(options);
 
@@ -575,8 +573,7 @@ fn test_basic_authentication() {
         connect_timeout: Duration::from_secs(300),
         user: Some("bob:secret".to_string()),
         compressed: false,
-        context_dir: FsDirectoryContext::new(".".to_string()),
-        resource_type: std::marker::PhantomData,
+        context_dir: PhysicalFS::new(PathBuf::from(".")).into(),
     };
     let mut client = Client::init(options);
     let request_spec = RequestSpec {
@@ -616,7 +613,7 @@ fn test_basic_authentication() {
         content_type: None,
     };
     assert_eq!(
-        request_spec.curl_args(&FsDirectoryContext::new(".".to_string())),
+        request_spec.curl_args(&PhysicalFS::new(PathBuf::from(".")).into()),
         vec!["'http://bob:secret@localhost:8000/basic-authentication'".to_string()]
     );
     let (request, response) = client.execute(&request_spec).unwrap();
@@ -659,8 +656,7 @@ fn test_error_fail_to_connect() {
         connect_timeout: Default::default(),
         user: None,
         compressed: false,
-        context_dir: FsDirectoryContext::new(".".to_string()),
-        resource_type: std::marker::PhantomData,
+        context_dir: PhysicalFS::new(PathBuf::from(".")).into(),
     };
     let mut client = Client::init(options);
     let request = default_get_request("http://localhost:8000/hello".to_string());
@@ -682,8 +678,7 @@ fn test_error_could_not_resolve_proxy_name() {
         connect_timeout: Default::default(),
         user: None,
         compressed: false,
-        context_dir: FsDirectoryContext::new(".".to_string()),
-        resource_type: std::marker::PhantomData,
+        context_dir: PhysicalFS::new(PathBuf::from(".")).into(),
     };
     let mut client = Client::init(options);
     let request_spec = default_get_request("http://localhost:8000/hello".to_string());
@@ -705,8 +700,7 @@ fn test_error_ssl() {
         connect_timeout: Default::default(),
         user: None,
         compressed: false,
-        context_dir: FsDirectoryContext::new(".".to_string()),
-        resource_type: std::marker::PhantomData,
+        context_dir: PhysicalFS::new(PathBuf::from(".")).into(),
     };
     let mut client = Client::init(options);
     let request_spec = default_get_request("https://localhost:8001/hello".to_string());
@@ -733,8 +727,7 @@ fn test_timeout() {
         connect_timeout: Default::default(),
         user: None,
         compressed: false,
-        context_dir: FsDirectoryContext::new(".".to_string()),
-        resource_type: std::marker::PhantomData,
+        context_dir: PhysicalFS::new(PathBuf::from(".")).into(),
     };
     let mut client = Client::init(options);
     let request_spec = default_get_request("http://localhost:8000/timeout".to_string());
@@ -756,8 +749,7 @@ fn test_accept_encoding() {
         connect_timeout: Default::default(),
         user: None,
         compressed: true,
-        context_dir: FsDirectoryContext::new(".".to_string()),
-        resource_type: std::marker::PhantomData,
+        context_dir: PhysicalFS::new(PathBuf::from(".")).into(),
     };
     let mut client = Client::init(options);
 
@@ -798,8 +790,7 @@ fn test_connect_timeout() {
         connect_timeout: Duration::from_secs(1),
         user: None,
         compressed: false,
-        context_dir: FsDirectoryContext::new(".".to_string()),
-        resource_type: std::marker::PhantomData,
+        context_dir: PhysicalFS::new(PathBuf::from(".")).into(),
     };
     let mut client = Client::init(options);
     let request_spec = default_get_request("http://10.0.0.0".to_string());
@@ -957,8 +948,7 @@ fn test_cookie_file() {
         connect_timeout: Duration::new(300, 0),
         user: None,
         compressed: false,
-        context_dir: FsDirectoryContext::new(".".to_string()),
-        resource_type: std::marker::PhantomData,
+        context_dir: PhysicalFS::new(PathBuf::from(".")).into(),
     };
     let mut client = Client::init(options);
     let request_spec = default_get_request(
@@ -1002,8 +992,7 @@ fn test_proxy() {
         connect_timeout: Duration::new(300, 0),
         user: None,
         compressed: false,
-        context_dir: FsDirectoryContext::new(".".to_string()),
-        resource_type: std::marker::PhantomData,
+        context_dir: PhysicalFS::new(PathBuf::from(".")).into(),
     };
     let mut client = Client::init(options);
     let request_spec = default_get_request("http://localhost:8000/proxy".to_string());
@@ -1032,8 +1021,7 @@ fn test_insecure() {
         connect_timeout: Duration::new(300, 0),
         user: None,
         compressed: false,
-        context_dir: FsDirectoryContext::new(".".to_string()),
-        resource_type: std::marker::PhantomData,
+        context_dir: PhysicalFS::new(PathBuf::from(".")).into(),
     };
     let mut client = Client::init(options);
     assert_eq!(client.options.curl_args(), vec!["--insecure".to_string()]);

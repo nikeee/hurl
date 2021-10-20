@@ -16,7 +16,6 @@
  *
  */
 use std::collections::HashMap;
-use std::io::Read;
 use std::time::Instant;
 
 use crate::http;
@@ -24,7 +23,6 @@ use hurl_core::ast::*;
 
 use super::core::*;
 use super::entry;
-use crate::runner::DirectoryContext;
 
 /// Run a Hurl file with the hurl http client
 ///
@@ -34,7 +32,7 @@ use crate::runner::DirectoryContext;
 /// use hurl_core::parser;
 /// use hurl::http;
 /// use hurl::runner;
-/// use hurl::runner::FsDirectoryContext;
+/// use vfs::PhysicalFS;
 ///
 /// // Parse Hurl file
 /// let filename = "sample.hurl".to_string();
@@ -62,8 +60,7 @@ use crate::runner::DirectoryContext;
 ///        connect_timeout: Default::default(),
 ///        user: None,
 ///        compressed: false,
-///        context_dir: FsDirectoryContext::new("".to_string()),
-///        resource_type: std::marker::PhantomData,
+///        context_dir: PhysicalFS::new(""),
 /// };
 /// let mut client = http::Client::init(options);
 ///
@@ -73,8 +70,7 @@ use crate::runner::DirectoryContext;
 ///        fail_fast: false,
 ///        variables,
 ///        to_entry: None,
-///        context_dir: FsDirectoryContext::new("current_dir".to_string()),
-///        resource_type: std::marker::PhantomData,
+///        context_dir: PhysicalFS::new("current_dir"),
 ///        ignore_asserts: false,
 ///        pre_entry: || true,
 ///        post_entry: || true,
@@ -94,11 +90,11 @@ use crate::runner::DirectoryContext;
 ///
 /// ```
 ///
-pub fn run<R: Read, D: DirectoryContext<R>>(
+pub fn run(
     hurl_file: HurlFile,
-    http_client: &mut http::Client<R, D>,
+    http_client: &mut http::Client,
     filename: String,
-    options: &RunnerOptions<R, D>,
+    options: &RunnerOptions,
     log_verbose: &impl Fn(&str),
     log_error_message: &impl Fn(bool, &str),
     log_error: &impl Fn(&Error, bool),

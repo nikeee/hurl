@@ -23,6 +23,8 @@ use std::collections::HashMap;
 #[allow(unused)]
 use std::io::prelude::*;
 
+use vfs::VfsPath;
+
 use crate::http;
 use hurl_core::ast::*;
 
@@ -31,12 +33,11 @@ use super::core::Error;
 use super::template::eval_template;
 use super::value::Value;
 use crate::runner::multipart::eval_multipart_param;
-use crate::runner::DirectoryContext;
 
-pub fn eval_request<R: Read, D: DirectoryContext<R>>(
+pub fn eval_request(
     request: Request,
     variables: &HashMap<String, Value>,
-    context_dir: &D,
+    context_dir: &VfsPath,
 ) -> Result<http::RequestSpec, Error> {
     let method = eval_method(request.method.clone());
 
@@ -193,9 +194,10 @@ fn eval_method(method: Method) -> http::Method {
 #[cfg(test)]
 mod tests {
     use hurl_core::ast::SourceInfo;
+    use std::path::PathBuf;
+    use vfs::PhysicalFS;
 
     use super::super::core::RunnerError;
-    use super::super::FsDirectoryContext;
     use super::*;
 
     pub fn whitespace() -> Whitespace {
@@ -335,7 +337,7 @@ mod tests {
         let error = eval_request(
             hello_request(),
             &variables,
-            &FsDirectoryContext::new("current_dir".to_string()),
+            &PhysicalFS::new(PathBuf::from("current_dir")).into(),
         )
         .err()
         .unwrap();
@@ -358,7 +360,7 @@ mod tests {
         let http_request = eval_request(
             hello_request(),
             &variables,
-            &FsDirectoryContext::new("current_dir".to_string()),
+            &PhysicalFS::new(PathBuf::from("current_dir")).into(),
         )
         .unwrap();
         assert_eq!(http_request, http::hello_http_request());
@@ -374,7 +376,7 @@ mod tests {
         let http_request = eval_request(
             query_request(),
             &variables,
-            &FsDirectoryContext::new("current_dir".to_string()),
+            &PhysicalFS::new(PathBuf::from("current_dir")).into(),
         )
         .unwrap();
         assert_eq!(http_request, http::query_http_request());

@@ -21,21 +21,20 @@ use std::collections::HashMap;
 use std::ffi::OsStr;
 #[allow(unused)]
 use std::io::prelude::*;
-use std::io::Read;
 use std::path::Path;
+use vfs::VfsPath;
 
 use crate::http;
-use crate::runner::DirectoryContext;
 use hurl_core::ast::*;
 
 use super::core::{Error, RunnerError};
 use super::template::eval_template;
 use super::value::Value;
 
-pub fn eval_multipart_param<R: Read, D: DirectoryContext<R>>(
+pub fn eval_multipart_param(
     multipart_param: MultipartParam,
     variables: &HashMap<String, Value>,
-    context_dir: &D,
+    context_dir: &VfsPath,
 ) -> Result<http::MultipartParam, Error> {
     match multipart_param {
         MultipartParam::Param(KeyValue { key, value, .. }) => {
@@ -50,42 +49,48 @@ pub fn eval_multipart_param<R: Read, D: DirectoryContext<R>>(
     }
 }
 
-pub fn eval_file_param<R: Read, D: DirectoryContext<R>>(
+pub fn eval_file_param(
     file_param: FileParam,
-    context_dir: &D,
+    context_dir: &VfsPath,
 ) -> Result<http::FileParam, Error> {
     let name = file_param.key.value;
 
     let filename = file_param.value.filename.clone();
 
-    let data = match context_dir.open(&filename) {
-        Ok(mut f) => {
-            let mut bytes = Vec::new();
-            match f.read_to_end(&mut bytes) {
-                Ok(_) => bytes,
-                Err(_) => {
-                    return Err(Error {
-                        source_info: filename.source_info.clone(),
-                        inner: RunnerError::FileReadAccess {
-                            value: context_dir.get_absolute_filename(&filename),
-                        },
-                        assert: false,
-                    });
-                }
+    let data = match context_dir.join(filename.value.as_str()) {
+        Ok(file_to_open) => match file_to_open.open_file() {
+            Ok(mut file_contents) => {
+                let mut bytes = Vec::new();
+                file_contents.read_to_end(&mut bytes).unwrap();
+                bytes
             }
-        }
+            Err(_) => {
+                return Err(Error {
+                    source_info: filename.source_info.clone(),
+                    inner: RunnerError::FileReadAccess {
+                        value: file_to_open.as_str().to_string(),
+                    },
+                    assert: false,
+                })
+            }
+        },
         Err(_) => {
             return Err(Error {
                 source_info: filename.source_info.clone(),
                 inner: RunnerError::FileReadAccess {
-                    value: context_dir.get_absolute_filename(&filename),
+                    value: filename.value.clone(),
                 },
                 assert: false,
             });
         }
     };
 
-    if !context_dir.exists(&filename) {
+    if !context_dir
+        .join(filename.value.as_str())
+        .unwrap()
+        .exists()
+        .unwrap()
+    {
         return Err(Error {
             source_info: filename.source_info,
             inner: RunnerError::FileReadAccess {
@@ -128,10 +133,10 @@ pub fn file_value_content_type(file_value: FileValue) -> String {
 
 #[cfg(test)]
 mod tests {
-    use hurl_core::ast::SourceInfo;
-
-    use super::super::FsDirectoryContext;
     use super::*;
+    use hurl_core::ast::SourceInfo;
+    use std::path::PathBuf;
+    use vfs::PhysicalFS;
 
     pub fn whitespace() -> Whitespace {
         Whitespace {
@@ -172,7 +177,7 @@ mod tests {
                     },
                     line_terminator0: line_terminator,
                 },
-                &FsDirectoryContext::new("tests".to_string()),
+                &PhysicalFS::new(PathBuf::from("tests")).into(),
             )
             .unwrap(),
             http::FileParam {

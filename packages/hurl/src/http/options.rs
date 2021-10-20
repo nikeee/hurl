@@ -15,13 +15,12 @@
  * limitations under the License.
  *
  */
-use std::io::Read;
+use std::path::PathBuf;
 use std::time::Duration;
-
-use crate::runner::{DirectoryContext, FsDirectoryContext};
+use vfs::{PhysicalFS, VfsPath};
 
 #[derive(Debug, Clone)]
-pub struct ClientOptions<R: Read, D: DirectoryContext<R>> {
+pub struct ClientOptions {
     pub follow_location: bool,
     pub max_redirect: Option<usize>,
     pub cookie_input_file: Option<String>,
@@ -33,11 +32,10 @@ pub struct ClientOptions<R: Read, D: DirectoryContext<R>> {
     pub connect_timeout: Duration,
     pub user: Option<String>,
     pub compressed: bool,
-    pub context_dir: D, // TODO: Option<D>`?
-    pub resource_type: std::marker::PhantomData<R>,
+    pub context_dir: VfsPath,
 }
 
-impl Default for ClientOptions<std::fs::File, FsDirectoryContext<std::fs::File>> {
+impl Default for ClientOptions {
     fn default() -> Self {
         ClientOptions {
             follow_location: false,
@@ -51,13 +49,12 @@ impl Default for ClientOptions<std::fs::File, FsDirectoryContext<std::fs::File>>
             connect_timeout: Duration::new(300, 0),
             user: None,
             compressed: false,
-            context_dir: FsDirectoryContext::new(".".to_string()),
-            resource_type: std::marker::PhantomData,
+            context_dir: PhysicalFS::new(PathBuf::from(".")).into(),
         }
     }
 }
 
-impl<R: Read, D: DirectoryContext<R>> ClientOptions<R, D> {
+impl ClientOptions {
     pub fn curl_args(&self) -> Vec<String> {
         let mut arguments = vec![];
 
@@ -126,8 +123,7 @@ mod tests {
                 connect_timeout: Duration::new(20, 0),
                 user: Some("user:password".to_string()),
                 compressed: true,
-                context_dir: FsDirectoryContext::new("".to_string()),
-                resource_type: std::marker::PhantomData,
+                context_dir: PhysicalFS::new(PathBuf::from("")).into(),
             }
             .curl_args(),
             [

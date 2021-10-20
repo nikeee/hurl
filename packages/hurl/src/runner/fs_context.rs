@@ -4,6 +4,8 @@ use std::path::Path;
 
 use hurl_core::ast::Filename;
 
+/*
+
 pub trait DirectoryContext<R: Read> {
     fn exists(&self, filename: &Filename) -> bool;
     fn open(&self, filename: &Filename) -> Result<R>;
@@ -58,3 +60,4 @@ impl<R: Read> DirectoryContext<File> for FsDirectoryContext<R> {
         self.base_dir.clone()
     }
 }
+*/

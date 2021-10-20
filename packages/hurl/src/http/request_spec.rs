@@ -17,8 +17,7 @@
  */
 
 use core::fmt;
-
-use super::super::runner::DirectoryContext;
+use vfs::VfsPath;
 
 use super::core::*;
 
@@ -120,10 +119,7 @@ impl RequestSpec {
     /// return request as curl arguments
     /// It does not contain the requests cookies (they will be accessed from the client)
     ///
-    pub fn curl_args<R: std::io::Read, D: DirectoryContext<R>>(
-        &self,
-        context_dir: &D,
-    ) -> Vec<String> {
+    pub fn curl_args(&self, context_dir: &VfsPath) -> Vec<String> {
         let querystring = if self.querystring.is_empty() {
             "".to_string()
         } else {
@@ -156,6 +152,7 @@ impl RequestSpec {
             .iter()
             .map(|h| h.name.clone())
             .any(|n| n.as_str() == "Content-Type");
+
         if !has_explicit_content_type {
             if let Some(content_type) = self.content_type.clone() {
                 if content_type.as_str() != "application/x-www-form-urlencoded"
@@ -182,7 +179,7 @@ impl RequestSpec {
             }
         }
 
-        let context_dir_arg = context_dir.get_curl_arg();
+        let context_dir_arg = context_dir.as_str();
 
         for param in self.form.clone() {
             arguments.push("--data".to_string());
@@ -190,7 +187,7 @@ impl RequestSpec {
         }
         for param in self.multipart.clone() {
             arguments.push("-F".to_string());
-            arguments.push(format!("'{}'", param.curl_arg(context_dir_arg.clone())));
+            arguments.push(format!("'{}'", param.curl_arg(context_dir_arg.to_string())));
         }
 
         if !self.body.bytes().is_empty() {
@@ -206,10 +203,10 @@ impl RequestSpec {
                 }
                 Body::Binary(bytes) => arguments.push(format!("$'{}'", encode_bytes(bytes))),
                 Body::File(_, filename) => {
-                    let prefix = if context_dir_arg.as_str() == "." {
+                    let prefix = if context_dir_arg == "." {
                         "".to_string()
                     } else {
-                        format!("{}/", context_dir_arg)
+                        format!("{}/", context_dir_arg.to_string())
                     };
                     arguments.push(format!("'@{}{}'", prefix, filename))
                 }
@@ -334,7 +331,8 @@ fn encode_value(s: String) -> String {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::runner::FsDirectoryContext;
+    use std::path::PathBuf;
+    use vfs::PhysicalFS;
 
     pub fn hello_http_request() -> RequestSpec {
         RequestSpec {
@@ -520,11 +518,11 @@ pub mod tests {
     #[test]
     fn requests_curl_args() {
         assert_eq!(
-            hello_http_request().curl_args(&FsDirectoryContext::new(".".to_string())),
+            hello_http_request().curl_args(&PhysicalFS::new(PathBuf::from(".")).into()),
             vec!["'http://localhost:8000/hello'".to_string()]
         );
         assert_eq!(
-            custom_http_request().curl_args(&FsDirectoryContext::new(".".to_string())),
+            custom_http_request().curl_args(&PhysicalFS::new(PathBuf::from(".")).into()),
             vec![
                 "'http://localhost/custom'".to_string(),
                 "-H".to_string(),
@@ -534,13 +532,13 @@ pub mod tests {
             ]
         );
         assert_eq!(
-            query_http_request().curl_args(&FsDirectoryContext::new(".".to_string())),
+            query_http_request().curl_args(&PhysicalFS::new(PathBuf::from(".")).into()),
             vec![
                 "'http://localhost:8000/querystring-params?param1=value1&param2=a%20b'".to_string()
             ]
         );
         assert_eq!(
-            form_http_request().curl_args(&FsDirectoryContext::new(".".to_string())),
+            form_http_request().curl_args(&PhysicalFS::new(PathBuf::from(".")).into()),
             vec![
                 "'http://localhost/form-params'".to_string(),
                 "-H".to_string(),

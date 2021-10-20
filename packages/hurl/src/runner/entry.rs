@@ -27,7 +27,6 @@ use super::request::eval_request;
 use super::response::{eval_asserts, eval_captures};
 use super::value::Value;
 use crate::runner::request::{cookie_storage_clear, cookie_storage_set};
-use crate::runner::DirectoryContext;
 
 /// Run an entry with the hurl http client
 /// Return one or more EntryResults (if following redirect)
@@ -48,14 +47,14 @@ use crate::runner::DirectoryContext;
 ////        all_proxy: None
 ////    });
 /// ```
-pub fn run<R: std::io::Read, D: DirectoryContext<R>>(
+pub fn run(
     entry: Entry,
-    http_client: &mut http::Client<R, D>,
+    http_client: &mut http::Client,
     entry_index: usize,
     variables: &mut HashMap<String, Value>,
     log_verbose: &impl Fn(&str),
     log_error_message: &impl Fn(bool, &str),
-    options: &RunnerOptions<R, D>,
+    options: &RunnerOptions,
 ) -> Vec<EntryResult> {
     let http_request = match eval_request(entry.request.clone(), variables, &options.context_dir) {
         Ok(r) => r,

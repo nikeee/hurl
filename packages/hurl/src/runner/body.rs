@@ -17,7 +17,7 @@
  */
 
 use std::collections::HashMap;
-use std::io::Read;
+use vfs::VfsPath;
 
 use hurl_core::ast::*;
 
@@ -26,20 +26,19 @@ use super::json::eval_json_value;
 use super::template::eval_template;
 use super::value::Value;
 use crate::http;
-use crate::runner::DirectoryContext;
 
-pub fn eval_body<R: Read, D: DirectoryContext<R>>(
+pub fn eval_body(
     body: Body,
     variables: &HashMap<String, Value>,
-    context_dir: &D,
+    context_dir: &VfsPath,
 ) -> Result<http::Body, Error> {
     eval_bytes(body.value, variables, context_dir)
 }
 
-pub fn eval_bytes<R: Read, D: DirectoryContext<R>>(
+pub fn eval_bytes(
     bytes: Bytes,
     variables: &HashMap<String, Value>,
-    context_dir: &D,
+    context_dir: &VfsPath,
 ) -> Result<http::Body, Error> {
     match bytes {
         // Body::Text
@@ -55,30 +54,35 @@ pub fn eval_bytes<R: Read, D: DirectoryContext<R>>(
 
         Bytes::Base64(Base64 { value, .. }) => Ok(http::Body::Binary(value)),
         Bytes::Hex(Hex { value, .. }) => Ok(http::Body::Binary(value)),
-        Bytes::File(File { filename, .. }) => match context_dir.open(&filename) {
-            Ok(mut file) => {
-                let mut body_contents = Vec::new();
-                file.read_to_end(&mut body_contents).unwrap();
 
-                Ok(http::Body::File(body_contents, filename.value))
-            }
-            Err(_) => Err(Error {
-                source_info: filename.source_info.clone(),
-                inner: RunnerError::FileReadAccess {
-                    value: context_dir.get_absolute_filename(&filename),
+        Bytes::File(File { filename, .. }) => {
+            let file_to_open = context_dir.join(filename.value.as_str()).unwrap();
+
+            match file_to_open.open_file() {
+                Ok(mut file_contents) => {
+                    let mut body_contents = Vec::new();
+                    file_contents.read_to_end(&mut body_contents).unwrap();
+
+                    Ok(http::Body::File(body_contents, filename.value))
                 },
-                assert: false,
-            }),
-        },
+                Err(_) => Err(Error {
+                    source_info: filename.source_info.clone(),
+                    inner: RunnerError::FileReadAccess {
+                        value: file_to_open.as_str().to_string(),
+                    },
+                    assert: false,
+                }),
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use hurl_core::ast::SourceInfo;
-
-    use super::super::FsDirectoryContext;
     use super::*;
+    use hurl_core::ast::SourceInfo;
+    use std::path::PathBuf;
+    use vfs::PhysicalFS;
 
     #[test]
     pub fn test_body_file() {
@@ -99,7 +103,12 @@ mod tests {
 
         let variables = HashMap::new();
         assert_eq!(
-            eval_bytes(bytes, &variables, &FsDirectoryContext::new(".".to_string())).unwrap(),
+            eval_bytes(
+                bytes,
+                &variables,
+                &PhysicalFS::new(PathBuf::from(".")).into()
+            )
+            .unwrap(),
             http::Body::File(b"Hello World!".to_vec(), "tests/data.bin".to_string())
         );
     }
@@ -127,7 +136,7 @@ mod tests {
         let error = eval_bytes(
             bytes,
             &variables,
-            &FsDirectoryContext::new("current_dir".to_string()),
+            &PhysicalFS::new(PathBuf::from("current_dir")).into(),
         )
         .err()
         .unwrap();
