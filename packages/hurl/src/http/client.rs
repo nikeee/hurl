@@ -28,9 +28,9 @@ use super::options::ClientOptions;
 use super::request::*;
 use super::request_spec::*;
 use super::response::*;
+use crate::runner::DirectoryContext;
 use std::str::FromStr;
 use url::Url;
-use crate::runner::DirectoryContext;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum HttpError {

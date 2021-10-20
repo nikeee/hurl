@@ -30,7 +30,7 @@ use hurl::http;
 use hurl::json;
 use hurl::report;
 use hurl::runner;
-use hurl::runner::{HurlResult, RunnerOptions, FsDirectoryContext};
+use hurl::runner::{FsDirectoryContext, HurlResult, RunnerOptions};
 use hurl_core::ast::{Pos, SourceInfo};
 use hurl_core::error::Error;
 use hurl_core::parser;

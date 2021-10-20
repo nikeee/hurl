@@ -16,8 +16,8 @@
  *
  */
 use std::collections::HashMap;
-use std::time::Instant;
 use std::io::Read;
+use std::time::Instant;
 
 use crate::http;
 use hurl_core::ast::*;

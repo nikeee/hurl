@@ -15,8 +15,8 @@
  * limitations under the License.
  *
  */
-use std::time::Duration;
 use std::io::Read;
+use std::time::Duration;
 
 use crate::runner::{DirectoryContext, FsDirectoryContext};
 

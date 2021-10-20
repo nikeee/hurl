@@ -239,8 +239,8 @@ pub fn eval_captures(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::FsDirectoryContext;
+    use super::*;
 
     use self::super::super::assert;
     use self::super::super::capture;

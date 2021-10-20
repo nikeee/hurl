@@ -57,11 +57,7 @@ pub fn run<R: std::io::Read, D: DirectoryContext<R>>(
     log_error_message: &impl Fn(bool, &str),
     options: &RunnerOptions<R, D>,
 ) -> Vec<EntryResult> {
-    let http_request = match eval_request(
-        entry.request.clone(),
-        variables,
-        &options.context_dir,
-    ) {
+    let http_request = match eval_request(entry.request.clone(), variables, &options.context_dir) {
         Ok(r) => r,
         Err(error) => {
             return vec![EntryResult {

@@ -55,24 +55,21 @@ pub fn eval_bytes<R: Read, D: DirectoryContext<R>>(
 
         Bytes::Base64(Base64 { value, .. }) => Ok(http::Body::Binary(value)),
         Bytes::Hex(Hex { value, .. }) => Ok(http::Body::Binary(value)),
-        Bytes::File(File { filename, .. }) => {
-            match context_dir.open(&filename) {
-                Ok(mut file) => {
+        Bytes::File(File { filename, .. }) => match context_dir.open(&filename) {
+            Ok(mut file) => {
+                let mut body_contents = Vec::new();
+                file.read_to_end(&mut body_contents).unwrap();
 
-                    let mut body_contents = Vec::new();
-                    file.read_to_end(&mut body_contents).unwrap();
-
-                    Ok(http::Body::File(body_contents, filename.value))
-                },
-                Err(_) => Err(Error {
-                    source_info: filename.source_info.clone(),
-                    inner: RunnerError::FileReadAccess {
-                        value: context_dir.get_absolute_filename(&filename),
-                    },
-                    assert: false,
-                }),
+                Ok(http::Body::File(body_contents, filename.value))
             }
-        }
+            Err(_) => Err(Error {
+                source_info: filename.source_info.clone(),
+                inner: RunnerError::FileReadAccess {
+                    value: context_dir.get_absolute_filename(&filename),
+                },
+                assert: false,
+            }),
+        },
     }
 }
 
@@ -80,8 +77,8 @@ pub fn eval_bytes<R: Read, D: DirectoryContext<R>>(
 mod tests {
     use hurl_core::ast::SourceInfo;
 
-    use super::*;
     use super::super::FsDirectoryContext;
+    use super::*;
 
     #[test]
     pub fn test_body_file() {
@@ -127,9 +124,13 @@ mod tests {
         let variables = HashMap::new();
 
         let separator = if cfg!(windows) { "\\" } else { "/" };
-        let error = eval_bytes(bytes, &variables, &FsDirectoryContext::new("current_dir".to_string()))
-            .err()
-            .unwrap();
+        let error = eval_bytes(
+            bytes,
+            &variables,
+            &FsDirectoryContext::new("current_dir".to_string()),
+        )
+        .err()
+        .unwrap();
         assert_eq!(
             error.inner,
             RunnerError::FileReadAccess {

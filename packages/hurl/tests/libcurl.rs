@@ -1,8 +1,8 @@
-use std::time::Duration;
 use std::fs::File;
+use std::time::Duration;
 
-use hurl::runner::FsDirectoryContext;
 use hurl::http::*;
+use hurl::runner::FsDirectoryContext;
 
 pub fn new_header(name: &str, value: &str) -> Header {
     Header {

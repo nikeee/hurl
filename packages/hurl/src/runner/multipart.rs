@@ -24,8 +24,8 @@ use std::io::prelude::*;
 use std::io::Read;
 use std::path::Path;
 
-use crate::runner::DirectoryContext;
 use crate::http;
+use crate::runner::DirectoryContext;
 use hurl_core::ast::*;
 
 use super::core::{Error, RunnerError};
@@ -130,8 +130,8 @@ pub fn file_value_content_type(file_value: FileValue) -> String {
 mod tests {
     use hurl_core::ast::SourceInfo;
 
-    use super::*;
     use super::super::FsDirectoryContext;
+    use super::*;
 
     pub fn whitespace() -> Whitespace {
         Whitespace {

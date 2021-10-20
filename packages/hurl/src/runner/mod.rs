@@ -27,9 +27,9 @@ pub use self::cookie::ResponseCookie;
 pub use self::core::{
     AssertResult, CaptureResult, EntryResult, Error, HurlResult, RunnerError, RunnerOptions,
 };
+pub use self::fs_context::{DirectoryContext, FsDirectoryContext};
 pub use self::hurl_file::run as run_hurl_file;
 pub use self::value::Value;
-pub use self::fs_context::{DirectoryContext, FsDirectoryContext};
 
 mod assert;
 mod body;
