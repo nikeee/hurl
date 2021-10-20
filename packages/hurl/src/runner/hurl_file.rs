@@ -74,6 +74,7 @@ use crate::runner::DirectoryContext;
 ///        variables,
 ///        to_entry: None,
 ///        context_dir: FsDirectoryContext::new("current_dir".to_string()),
+///        resource_type: std::marker::PhantomData,
 ///        ignore_asserts: false,
 ///        pre_entry: || true,
 ///        post_entry: || true,
