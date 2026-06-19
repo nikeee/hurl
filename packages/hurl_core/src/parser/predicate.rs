@@ -81,6 +81,7 @@ fn predicate_func_value(reader: &mut Reader) -> ParseResult<PredicateFuncValue> 
             end_with_predicate,
             contain_predicate,
             include_predicate,
+            matches_json_schema_predicate,
             match_predicate,
             integer_predicate,
             float_predicate,
@@ -259,6 +260,24 @@ fn match_predicate(reader: &mut Reader) -> ParseResult<PredicateFuncValue> {
         ));
     }
     Ok(PredicateFuncValue::Match { space0, value })
+}
+
+fn matches_json_schema_predicate(reader: &mut Reader) -> ParseResult<PredicateFuncValue> {
+    try_literal("matchesJsonSchema", reader)?;
+    let space0 = one_or_more_spaces(reader)?;
+    let save = reader.cursor();
+    let value = predicate_value(reader)?;
+    if !matches!(value, PredicateValue::String(_))
+        && !matches!(value, PredicateValue::MultilineString(_))
+        && !matches!(value, PredicateValue::File(_))
+    {
+        return Err(ParseError::new(
+            save.pos,
+            false,
+            ParseErrorKind::PredicateValue,
+        ));
+    }
+    Ok(PredicateFuncValue::MatchesJsonSchema { space0, value })
 }
 
 fn integer_predicate(reader: &mut Reader) -> ParseResult<PredicateFuncValue> {
@@ -517,5 +536,42 @@ mod tests {
         let mut reader = Reader::new("isDate");
         let result = date_predicate(&mut reader);
         assert_eq!(result.unwrap(), PredicateFuncValue::IsDate);
+    }
+
+    #[test]
+    fn test_matches_json_schema_predicate() {
+        let mut reader = Reader::new("matchesJsonSchema \"{}\"");
+        assert_eq!(
+            matches_json_schema_predicate(&mut reader).unwrap(),
+            PredicateFuncValue::MatchesJsonSchema {
+                space0: Whitespace {
+                    value: String::from(" "),
+                    source_info: SourceInfo::new(Pos::new(1, 18), Pos::new(1, 19)),
+                },
+                value: PredicateValue::String(Template::new(
+                    Some('"'),
+                    vec![TemplateElement::String {
+                        value: "{}".to_string(),
+                        source: "{}".to_source(),
+                    }],
+                    SourceInfo::new(Pos::new(1, 19), Pos::new(1, 23)),
+                )),
+            }
+        );
+    }
+
+    #[test]
+    fn test_matches_json_schema_predicate_invalid_value() {
+        let mut reader = Reader::new("matchesJsonSchema 2");
+        let error = matches_json_schema_predicate(&mut reader).err().unwrap();
+        assert_eq!(
+            error.pos,
+            Pos {
+                line: 1,
+                column: 19,
+            }
+        );
+        assert!(!error.recoverable);
+        assert_eq!(error.kind, ParseErrorKind::PredicateValue);
     }
 }

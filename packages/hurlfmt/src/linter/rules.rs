@@ -348,6 +348,12 @@ fn lint_predicate_func_value(predicate_func_value: &PredicateFuncValue) -> Predi
             space0: one_whitespace(),
             value: lint_predicate_value(value),
         },
+        PredicateFuncValue::MatchesJsonSchema { value, .. } => {
+            PredicateFuncValue::MatchesJsonSchema {
+                space0: one_whitespace(),
+                value: lint_predicate_value(value),
+            }
+        }
         PredicateFuncValue::StartWith { value, .. } => PredicateFuncValue::StartWith {
             space0: one_whitespace(),
             value: lint_predicate_value(value),

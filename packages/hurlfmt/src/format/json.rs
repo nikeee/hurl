@@ -567,6 +567,9 @@ impl ToJson for Predicate {
             PredicateFuncValue::Match { value, .. } => {
                 add_predicate_value(&mut attributes, value);
             }
+            PredicateFuncValue::MatchesJsonSchema { value, .. } => {
+                add_predicate_value(&mut attributes, value);
+            }
             PredicateFuncValue::Exist
             | PredicateFuncValue::IsBoolean
             | PredicateFuncValue::IsCollection

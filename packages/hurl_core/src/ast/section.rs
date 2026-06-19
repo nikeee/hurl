@@ -409,6 +409,10 @@ pub enum PredicateFuncValue {
         space0: Whitespace,
         value: PredicateValue,
     },
+    MatchesJsonSchema {
+        space0: Whitespace,
+        value: PredicateValue,
+    },
     Exist,
     IsBoolean,
     IsCollection,
@@ -441,6 +445,7 @@ impl PredicateFuncValue {
             PredicateFuncValue::Contain { .. } => "contains",
             PredicateFuncValue::Include { .. } => "includes",
             PredicateFuncValue::Match { .. } => "matches",
+            PredicateFuncValue::MatchesJsonSchema { .. } => "matchesJsonSchema",
             PredicateFuncValue::Exist => "exists",
             PredicateFuncValue::IsBoolean => "isBoolean",
             PredicateFuncValue::IsCollection => "isCollection",

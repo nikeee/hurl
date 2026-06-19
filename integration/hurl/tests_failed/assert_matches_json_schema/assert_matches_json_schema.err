@@ -1,0 +1,11 @@
+error: Assert failure
+  --> tests_failed/assert_matches_json_schema/assert_matches_json_schema.hurl:4:0
+   |
+   | GET http://localhost:8000/error-assert-matches-json-schema
+   | ...
+ 4 | body matchesJsonSchema "{ \"type\": \"object\", \"required\": [\"name\"] }"
+   |   actual:   string <{"id": 1}>
+   |   expected: matches JSON schema
+   |   >>> at '': missing properties 'name'
+   |
+

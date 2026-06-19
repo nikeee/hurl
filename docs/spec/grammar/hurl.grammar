@@ -343,6 +343,7 @@ predicate-func:
   | less-or-equal-predicate
   | less-predicate
   | match-predicate
+  | matches-json-schema-predicate
   | not-equal-predicate
   | start-with-predicate
 
@@ -391,6 +392,8 @@ less-or-equal-predicate: "<=" sp (number | quoted-string | placeholder)
 less-predicate: "<" sp (number | quoted-string | placeholder)
 
 match-predicate: "matches" sp (quoted-string | regex)
+
+matches-json-schema-predicate: "matchesJsonSchema" sp (quoted-string | multiline-string | oneline-file)
 
 not-equal-predicate: "!=" sp predicate-value
 

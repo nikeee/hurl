@@ -194,6 +194,7 @@ fn expected_no_value(
             let expected = eval_predicate_value_template(expected, variables)?;
             Ok(format!("matches regex <{expected}>"))
         }
+        PredicateFuncValue::MatchesJsonSchema { .. } => Ok("matches JSON schema".to_string()),
         PredicateFuncValue::Exist => Ok("something".to_string()),
         PredicateFuncValue::IsBoolean => Ok("boolean".to_string()),
         PredicateFuncValue::IsCollection => Ok("collection".to_string()),
@@ -268,6 +269,15 @@ fn eval_predicate_func(
         PredicateFuncValue::Match {
             value: expected, ..
         } => eval_match(
+            expected,
+            predicate_func.source_info,
+            variables,
+            value,
+            context_dir,
+        ),
+        PredicateFuncValue::MatchesJsonSchema {
+            value: expected, ..
+        } => eval_matches_json_schema(
             expected,
             predicate_func.source_info,
             variables,
@@ -481,6 +491,140 @@ fn eval_match(
             false,
         )),
     }
+}
+
+/// Evaluates if an `actual` value is valid against the JSON schema given by `expected`.
+///
+/// The schema is provided as a quoted string, a multiline string or a `file,...;` reference. The
+/// actual value is interpreted as JSON: a string/bytes value (typically the response `body`) is
+/// parsed as a JSON document, while structured values (objects, lists returned by `jsonpath`) are
+/// converted directly.
+fn eval_matches_json_schema(
+    expected: &PredicateValue,
+    source_info: SourceInfo,
+    variables: &VariableSet,
+    actual: &Value,
+    context_dir: &ContextDir,
+) -> Result<PredicateResult, RunnerError> {
+    // Resolve the schema value (string / multiline string / file) to its textual content.
+    let schema_value = eval_predicate_value(expected, variables, context_dir)?;
+    let schema_text = match &schema_value {
+        Value::String(s) => s.clone(),
+        Value::Bytes(bytes) => match String::from_utf8(bytes.clone()) {
+            Ok(s) => s,
+            Err(_) => {
+                return Err(RunnerError::new(
+                    source_info,
+                    RunnerErrorKind::InvalidJsonSchema {
+                        message: "schema is not valid UTF-8".to_string(),
+                    },
+                    false,
+                ));
+            }
+        },
+        // The parser restricts the predicate value to string / multiline string / file.
+        _ => {
+            return Err(RunnerError::new(
+                source_info,
+                RunnerErrorKind::InvalidJsonSchema {
+                    message: "schema must be a string".to_string(),
+                },
+                false,
+            ));
+        }
+    };
+
+    // Parse and compile the schema. Any error here is a hard runner error (the schema itself is
+    // malformed), not an assertion failure.
+    let schema_json = match serde_json::from_str::<serde_json::Value>(&schema_text) {
+        Ok(value) => value,
+        Err(e) => {
+            return Err(RunnerError::new(
+                source_info,
+                RunnerErrorKind::InvalidJsonSchema {
+                    message: e.to_string(),
+                },
+                false,
+            ));
+        }
+    };
+
+    let schema_url = "json-schema:///schema.json";
+    let mut compiler = boon::Compiler::new();
+    if let Err(e) = compiler.add_resource(schema_url, schema_json) {
+        return Err(RunnerError::new(
+            source_info,
+            RunnerErrorKind::InvalidJsonSchema {
+                message: e.to_string(),
+            },
+            false,
+        ));
+    }
+    let mut schemas = boon::Schemas::new();
+    let schema_index = match compiler.compile(schema_url, &mut schemas) {
+        Ok(index) => index,
+        Err(e) => {
+            return Err(RunnerError::new(
+                source_info,
+                RunnerErrorKind::InvalidJsonSchema {
+                    message: e.to_string(),
+                },
+                false,
+            ));
+        }
+    };
+
+    let actual_display = actual.repr();
+    let expected_display = "matches JSON schema".to_string();
+
+    // Coerce the actual value to a JSON instance.
+    let instance = match actual {
+        Value::String(s) => serde_json::from_str::<serde_json::Value>(s).ok(),
+        Value::Bytes(bytes) => serde_json::from_slice::<serde_json::Value>(bytes).ok(),
+        other => other.try_to_json(),
+    };
+    let Some(instance) = instance else {
+        // The actual value is not a JSON document (e.g. a non-JSON body or a non-JSON value).
+        return Ok(PredicateResult {
+            success: false,
+            actual: actual_display,
+            expected: expected_display,
+            type_mismatch: true,
+        });
+    };
+
+    match schemas.validate(&instance, schema_index) {
+        Ok(()) => Ok(PredicateResult {
+            success: true,
+            actual: actual_display,
+            expected: expected_display,
+            type_mismatch: false,
+        }),
+        Err(error) => Ok(PredicateResult {
+            success: false,
+            actual: actual_display,
+            expected: format!(
+                "{expected_display}{}",
+                format_json_schema_validation_error(&error)
+            ),
+            type_mismatch: false,
+        }),
+    }
+}
+
+/// Formats a JSON schema validation `error` as Hurl `>>>` detail lines, to be appended to the
+/// `expected` message of a failed `matchesJsonSchema` predicate.
+///
+/// `boon`'s `Display` produces a header line (referencing the internal schema URL) followed by one
+/// `- at '<location>': <message>` line per failure. The header is dropped and each failure is
+/// rendered as an indented `>>>` line, e.g. `>>> at '/id': want string, but got number`.
+fn format_json_schema_validation_error(error: &boon::ValidationError) -> String {
+    error
+        .to_string()
+        .lines()
+        .skip(1)
+        .map(|line| format!("\n   >>> {}", line.trim_start().trim_start_matches("- ")))
+        .collect()
 }
 
 /// Evaluates if an `actual` value is an integer.
@@ -1566,6 +1710,121 @@ mod tests {
         assert!(!result.type_mismatch);
         assert_eq!(result.actual, "string <aa>");
         assert_eq!(result.expected, "matches regex </a{3}/>");
+    }
+
+    /// Builds a quoted-string `PredicateValue` holding `s` verbatim (used as a JSON schema).
+    fn schema_string(s: &str) -> PredicateValue {
+        PredicateValue::String(Template::new(
+            Some('"'),
+            vec![TemplateElement::String {
+                value: s.to_string(),
+                source: s.to_source(),
+            }],
+            SourceInfo::new(Pos::new(0, 0), Pos::new(0, 0)),
+        ))
+    }
+
+    #[test]
+    fn test_predicate_matches_json_schema() {
+        let variables = VariableSet::new();
+        let current_dir = Path::new("/home");
+        let file_root = Path::new("file_root");
+        let context_dir = ContextDir::new(current_dir, file_root);
+        let source_info = SourceInfo::new(Pos::new(0, 0), Pos::new(0, 0));
+
+        let schema = schema_string(r#"{"type": "object", "required": ["name"]}"#);
+
+        // A JSON body (Value::String) that conforms to the schema.
+        let value = Value::String(r#"{"name": "Bob"}"#.to_string());
+        let result =
+            eval_matches_json_schema(&schema, source_info, &variables, &value, &context_dir)
+                .unwrap();
+        assert!(result.success);
+        assert!(!result.type_mismatch);
+        assert_eq!(result.expected, "matches JSON schema");
+
+        // A JSON body that does not conform (missing `name`). The failure reason is surfaced.
+        let value = Value::String(r#"{"age": 42}"#.to_string());
+        let result =
+            eval_matches_json_schema(&schema, source_info, &variables, &value, &context_dir)
+                .unwrap();
+        assert!(!result.success);
+        assert!(!result.type_mismatch);
+        assert!(result.expected.starts_with("matches JSON schema"));
+        assert!(
+            result
+                .expected
+                .contains(">>> at '': missing properties 'name'")
+        );
+
+        // A structured value (as returned by `jsonpath`) that conforms.
+        let value = Value::Object(vec![("name".to_string(), Value::String("Bob".to_string()))]);
+        let result =
+            eval_matches_json_schema(&schema, source_info, &variables, &value, &context_dir)
+                .unwrap();
+        assert!(result.success);
+    }
+
+    #[test]
+    fn test_predicate_matches_json_schema_non_json_body() {
+        let variables = VariableSet::new();
+        let current_dir = Path::new("/home");
+        let file_root = Path::new("file_root");
+        let context_dir = ContextDir::new(current_dir, file_root);
+        let source_info = SourceInfo::new(Pos::new(0, 0), Pos::new(0, 0));
+
+        let schema = schema_string(r#"{"type": "object"}"#);
+        // The body is not valid JSON: this is a type mismatch, not a hard error.
+        let value = Value::String("not json".to_string());
+        let result =
+            eval_matches_json_schema(&schema, source_info, &variables, &value, &context_dir)
+                .unwrap();
+        assert!(!result.success);
+        assert!(result.type_mismatch);
+    }
+
+    #[test]
+    fn test_predicate_matches_json_schema_invalid_schema() {
+        let variables = VariableSet::new();
+        let current_dir = Path::new("/home");
+        let file_root = Path::new("file_root");
+        let context_dir = ContextDir::new(current_dir, file_root);
+        let source_info = SourceInfo::new(Pos::new(0, 0), Pos::new(0, 0));
+
+        // The schema itself is not valid JSON: this is a hard runner error.
+        let schema = schema_string("this is not a schema");
+        let value = Value::String(r#"{"name": "Bob"}"#.to_string());
+        let error =
+            eval_matches_json_schema(&schema, source_info, &variables, &value, &context_dir)
+                .unwrap_err();
+        assert!(matches!(
+            error.kind,
+            RunnerErrorKind::InvalidJsonSchema { .. }
+        ));
+    }
+
+    #[test]
+    fn test_predicate_matches_json_schema_numeric_constraint() {
+        // Ensures boon validates numbers correctly under serde_json's `arbitrary_precision`.
+        let variables = VariableSet::new();
+        let current_dir = Path::new("/home");
+        let file_root = Path::new("file_root");
+        let context_dir = ContextDir::new(current_dir, file_root);
+        let source_info = SourceInfo::new(Pos::new(0, 0), Pos::new(0, 0));
+
+        let schema = schema_string(r#"{"type": "integer", "minimum": 10}"#);
+
+        let value = Value::Number(Number::Integer(42));
+        let result =
+            eval_matches_json_schema(&schema, source_info, &variables, &value, &context_dir)
+                .unwrap();
+        assert!(result.success);
+
+        let value = Value::Number(Number::Integer(3));
+        let result =
+            eval_matches_json_schema(&schema, source_info, &variables, &value, &context_dir)
+                .unwrap();
+        assert!(!result.success);
     }
 
     #[test]

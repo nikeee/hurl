@@ -538,6 +538,44 @@ impl Value {
             }
         }
     }
+
+    /// Converts this value to a [`serde_json::Value`] when it has a structural JSON representation.
+    ///
+    /// Returns `None` for values that have no JSON counterpart (dates, regexes, nodesets, etc.).
+    /// Unlike [`Value::to_json`], no lossy fallback encoding is used: non-JSON values yield `None`
+    /// so that callers (e.g. JSON schema validation) can treat them as type mismatches.
+    pub fn try_to_json(&self) -> Option<serde_json::Value> {
+        match self {
+            Value::Null => Some(serde_json::Value::Null),
+            Value::Bool(b) => Some(serde_json::Value::Bool(*b)),
+            Value::Number(Number::Integer(i)) => Some(serde_json::Value::Number((*i).into())),
+            Value::Number(Number::Float(f)) => {
+                serde_json::Number::from_f64(*f).map(serde_json::Value::Number)
+            }
+            Value::Number(Number::BigInteger(s)) => serde_json::from_str(s).ok(),
+            Value::String(s) => Some(serde_json::Value::String(s.clone())),
+            Value::List(elements) => {
+                let mut values = vec![];
+                for element in elements {
+                    values.push(element.try_to_json()?);
+                }
+                Some(serde_json::Value::Array(values))
+            }
+            Value::Object(elements) => {
+                let mut map = serde_json::Map::new();
+                for (key, value) in elements {
+                    map.insert(key.clone(), value.try_to_json()?);
+                }
+                Some(serde_json::Value::Object(map))
+            }
+            Value::Bytes(_)
+            | Value::Date(_)
+            | Value::HttpResponse(_)
+            | Value::Nodeset(_)
+            | Value::Regex(_)
+            | Value::Unit => None,
+        }
+    }
 }
 
 #[cfg(test)]

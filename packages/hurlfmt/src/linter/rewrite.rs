@@ -629,6 +629,10 @@ impl Lint for PredicateFuncValue {
                 s.push(' ');
                 s.push_str(&value.lint());
             }
+            PredicateFuncValue::MatchesJsonSchema { value, .. } => {
+                s.push(' ');
+                s.push_str(&value.lint());
+            }
             PredicateFuncValue::Exist
             | PredicateFuncValue::IsBoolean
             | PredicateFuncValue::IsCollection
