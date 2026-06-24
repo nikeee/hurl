@@ -15,11 +15,12 @@
  * limitations under the License.
  *
  */
+use std::path::PathBuf;
 use std::thread;
 use std::time::Instant;
 
 use chrono::Utc;
-use hurl_core::ast::{Entry, OptionKind, SourceInfo};
+use hurl_core::ast::{Entry, EntryKind, Include, OptionKind, SourceInfo};
 use hurl_core::error::{DisplaySourceError, OutputFormat};
 use hurl_core::input::Input;
 use hurl_core::parser;
@@ -27,14 +28,17 @@ use hurl_core::types::{Count, Index};
 
 use crate::http::{Call, Client, CredentialForwarding, FollowLocation};
 use crate::util::logger::{ErrorFormat, Logger, LoggerOptions};
+use crate::util::path::ContextDir;
 use crate::util::term::{Stderr, Stdout, WriteMode};
 
+use super::error::{RunnerError, RunnerErrorKind};
 use super::event::EventListener;
-use super::options;
-use super::result::{EntryResult, HurlResult};
+use super::result::{EntryResult, EntrySource, HurlResult};
 use super::runner_options::RunnerOptions;
+use super::template::eval_template;
+use super::value::Value;
 use super::variable::VariableSet;
-use super::{Output, entry};
+use super::{Output, entry, options};
 
 /// Runs a Hurl `content` and returns a [`HurlResult`] upon completion.
 ///
@@ -149,7 +153,7 @@ pub fn run(
 /// New entry run events are reported to `progress` and are usually used to display a progress bar
 /// in test mode.
 pub fn run_entries(
-    entries: &[Entry],
+    entries: &[EntryKind],
     content: &str,
     filename: Option<&Input>,
     runner_options: &RunnerOptions,
@@ -157,6 +161,38 @@ pub fn run_entries(
     stdout: &mut Stdout,
     listener: Option<&dyn EventListener>,
     logger: &mut Logger,
+) -> HurlResult {
+    // Seed the include stack with the canonical path of the top-level file so a sub-script that
+    // includes it (directly or indirectly) is detected as a cycle.
+    let mut include_stack = vec![];
+    if let Some(path) = filename.and_then(Input::path) {
+        include_stack.push(runner_options.context_dir.current_dir().join(path));
+    }
+    run_entries_inner(
+        entries,
+        content,
+        filename,
+        runner_options,
+        variables,
+        stdout,
+        listener,
+        logger,
+        &mut include_stack,
+    )
+}
+
+/// Runs a list of `entries`, threading the `include_stack` used for `INCLUDE` cycle detection.
+#[allow(clippy::too_many_arguments)]
+fn run_entries_inner(
+    entries: &[EntryKind],
+    content: &str,
+    filename: Option<&Input>,
+    runner_options: &RunnerOptions,
+    variables: &VariableSet,
+    stdout: &mut Stdout,
+    listener: Option<&dyn EventListener>,
+    logger: &mut Logger,
+    include_stack: &mut Vec<PathBuf>,
 ) -> HurlResult {
     // Early returns for empty entries.
     if entries.is_empty() {
@@ -188,7 +224,34 @@ pub fn run_entries(
         if current > last {
             break;
         }
-        let entry = &entries[current.to_zero_based()];
+        let entry = match &entries[current.to_zero_based()] {
+            EntryKind::Request(entry) => entry,
+            EntryKind::Include(include) => {
+                log_run_entry(current, logger);
+                if let Some(listener) = listener {
+                    listener.on_entry_running(current, last, 0);
+                }
+                let results = run_include(
+                    include,
+                    current,
+                    content,
+                    filename,
+                    runner_options,
+                    &mut variables,
+                    stdout,
+                    listener,
+                    logger,
+                    include_stack,
+                );
+                let has_error = results.last().is_some_and(|r| !r.errors.is_empty());
+                entries_result.extend(results);
+                if !runner_options.continue_on_error && has_error {
+                    break;
+                }
+                current += 1;
+                continue;
+            }
+        };
 
         // We compute the new logger verbosity for this entry, before entering into the `run`
         // function because entry options can modify the logger verbosity and we want the preamble
@@ -426,6 +489,183 @@ fn run_request(
     results
 }
 
+/// Builds an [`EntryResult`] carrying a single non-assert runner error for an `INCLUDE` directive.
+fn include_error_result(
+    current: Index,
+    source_info: SourceInfo,
+    kind: RunnerErrorKind,
+) -> EntryResult {
+    EntryResult {
+        entry_index: current,
+        source_info,
+        errors: vec![RunnerError::new(source_info, kind, false)],
+        ..Default::default()
+    }
+}
+
+/// Runs an `INCLUDE` directive: executes the referenced Hurl file as an isolated sub-script and
+/// promotes the renamed `[Captures]` variables back into the parent `variables`.
+///
+/// The sub-script runs in a fresh environment: its variable set is seeded only by the evaluated
+/// `[Variables]` section, and it uses its own HTTP client (see [`run_entries_inner`]). `INCLUDE`
+/// cycles are detected through `include_stack`. Returns the flattened list of [`EntryResult`] of
+/// the sub-script (plus a possible error entry for the include directive itself).
+#[allow(clippy::too_many_arguments)]
+fn run_include(
+    include: &Include,
+    current: Index,
+    content: &str,
+    filename: Option<&Input>,
+    runner_options: &RunnerOptions,
+    variables: &mut VariableSet,
+    stdout: &mut Stdout,
+    listener: Option<&dyn EventListener>,
+    logger: &mut Logger,
+    include_stack: &mut Vec<PathBuf>,
+) -> Vec<EntryResult> {
+    let source_info = include.source_info;
+
+    // Evaluate the include path in the parent variable context.
+    let path = match eval_template(&include.path, variables) {
+        Ok(path) => path,
+        Err(error) => {
+            let result = EntryResult {
+                entry_index: current,
+                source_info,
+                errors: vec![error],
+                ..Default::default()
+            };
+            log_errors(&result, content, filename, false, logger);
+            return vec![result];
+        }
+    };
+
+    let rel = std::path::Path::new(&path);
+    let resolved = runner_options.context_dir.resolved_path(rel);
+    let cycle_key = runner_options.context_dir.absolute_path(rel);
+
+    // Cycle detection: error out if this file is already on the include path.
+    if include_stack.contains(&cycle_key) {
+        let kind = RunnerErrorKind::IncludeCycle {
+            path: resolved.clone(),
+        };
+        let result = include_error_result(current, source_info, kind);
+        log_errors(&result, content, filename, false, logger);
+        return vec![result];
+    }
+
+    // Read and parse the included file.
+    let input = Input::from(resolved.clone());
+    let sub_content = match input.read_to_string() {
+        Ok(content) => content,
+        Err(_) => {
+            let kind = RunnerErrorKind::IncludeFileRead {
+                path: resolved.clone(),
+            };
+            let result = include_error_result(current, source_info, kind);
+            log_errors(&result, content, filename, false, logger);
+            return vec![result];
+        }
+    };
+    let sub_hurl_file = match parser::parse_hurl_file(&sub_content) {
+        Ok(hurl_file) => hurl_file,
+        Err(error) => {
+            let kind = RunnerErrorKind::IncludeParse {
+                message: error.description(),
+            };
+            let result = include_error_result(current, source_info, kind);
+            log_errors(&result, content, filename, false, logger);
+            return vec![result];
+        }
+    };
+
+    // Seed a fresh, isolated variable set from the `[Variables]` section (evaluated in the parent
+    // context). No CLI/global/parent-capture variable leaks into the sub-script.
+    let mut sub_variables = VariableSet::new();
+    for kv in include.variables() {
+        let value = match eval_template(&kv.value, variables) {
+            Ok(value) => value,
+            Err(error) => {
+                let result = EntryResult {
+                    entry_index: current,
+                    source_info,
+                    errors: vec![error],
+                    ..Default::default()
+                };
+                log_errors(&result, content, filename, false, logger);
+                return vec![result];
+            }
+        };
+        sub_variables.insert(kv.key.to_string(), Value::String(value));
+    }
+
+    // Build runner options for the sub-run: relative paths resolve against the sub-file directory.
+    let mut sub_options = runner_options.clone();
+    let sub_file_root = resolved
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new(""));
+    sub_options.context_dir =
+        ContextDir::new(runner_options.context_dir.current_dir(), sub_file_root);
+
+    // Run the sub-script in isolation. A fresh HTTP client (cookie store) is created inside
+    // `run_entries_inner`, so the HTTP session is isolated from the parent.
+    include_stack.push(cycle_key);
+    let sub_result = run_entries_inner(
+        &sub_hurl_file.entries,
+        &sub_content,
+        Some(&input),
+        &sub_options,
+        &sub_variables,
+        stdout,
+        listener,
+        logger,
+        include_stack,
+    );
+    include_stack.pop();
+
+    let mut results = sub_result.entries;
+
+    // Attach the sub-file source to each entry result that doesn't already carry one (deeper
+    // includes keep their own source), so reports and errors point at the real sub-file.
+    for entry_result in &mut results {
+        if entry_result.source.is_none() {
+            entry_result.source = Some(EntrySource {
+                filename: input.clone(),
+                content: sub_content.clone(),
+            });
+        }
+    }
+
+    // Promote the renamed `[Captures]` variables back into the parent. Only done when the sub-script
+    // ran successfully; a failed sub-script already reports its own errors.
+    if sub_result.success {
+        for capture in include.captures() {
+            let name = capture.name.to_string();
+            let target = capture.target.to_string();
+            match sub_result.variables.get(&name) {
+                Some(variable) => {
+                    let value = variable.value().clone();
+                    if variable.is_secret()
+                        && let Value::String(s) = &value
+                    {
+                        variables.insert_secret(target, s.clone());
+                    } else {
+                        variables.insert(target, value);
+                    }
+                }
+                None => {
+                    let kind = RunnerErrorKind::IncludeMissingCapture { name };
+                    let result = include_error_result(current, source_info, kind);
+                    log_errors(&result, content, filename, false, logger);
+                    results.push(result);
+                }
+            }
+        }
+    }
+
+    results
+}
+
 /// Writes this `entry_result` HTTP body response to the file `output`. This function
 /// can possibly mut this `entry_result` errors with I/O or unauthorized access errors.
 ///
@@ -573,7 +813,7 @@ fn get_non_default_options(options: &RunnerOptions) -> Vec<(&'static str, String
 
 /// Logs various debug information at the start of `hurl_file` run.
 fn log_run_info(
-    entries: &[Entry],
+    entries: &[EntryKind],
     runner_options: &RunnerOptions,
     variables: &VariableSet,
     logger: &mut Logger,

@@ -57,16 +57,21 @@ impl Testcase {
     }
 
     /// Formats a list of Hurl errors to HTML snippet.
+    ///
+    /// `content` is the top-level file content; errors coming from an included sub-script are
+    /// rendered against — and linked to — their own source document.
     fn get_errors_html(&self, content: &str, secrets: &[&str]) -> String {
+        let docs = self.source_docs(content);
         self.errors
             .iter()
-            .map(|(error, entry_src_info)| {
+            .map(|(error, entry_src_info, source)| {
+                let doc = Testcase::doc_for(source, &docs);
                 let error = error_to_html(
                     error,
                     *entry_src_info,
-                    content,
-                    &self.filename,
-                    &self.source_filename(),
+                    &doc.content,
+                    &doc.filename,
+                    &doc.page,
                     secrets,
                 );
                 format!("<div class=\"error\"><div class=\"error-desc\">{error}</div></div>")

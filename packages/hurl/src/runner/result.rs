@@ -20,6 +20,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use hurl_core::ast::SourceInfo;
+use hurl_core::input::Input;
 use hurl_core::reader::Pos;
 use hurl_core::types::Index;
 
@@ -58,25 +59,43 @@ impl HurlResult {
     /// The errors are only the "effective" ones: those that are due to retry are
     /// ignored.
     pub fn errors(&self) -> Vec<(&RunnerError, SourceInfo)> {
+        self.errors_with_source()
+            .into_iter()
+            .map(|(error, source_info, _)| (error, source_info))
+            .collect()
+    }
+
+    /// Same as [`HurlResult::errors`] but also returns the source (file and content) of the entry
+    /// where each error happens. The source is `Some` only for entries run from an included
+    /// sub-script (see `INCLUDE`); it is `None` for entries of the top-level file (callers should
+    /// then fall back to the run-level filename and content).
+    pub fn errors_with_source(&self) -> Vec<(&RunnerError, SourceInfo, Option<&EntrySource>)> {
         let mut errors = vec![];
         let mut next_entries = self.entries.iter().skip(1);
         for entry in self.entries.iter() {
-            match next_entries.next() {
-                None => {
-                    let new_errors = entry.errors.iter().map(|error| (error, entry.source_info));
-                    errors.extend(new_errors);
-                }
-                Some(next) => {
-                    if next.entry_index != entry.entry_index {
-                        let new_errors =
-                            entry.errors.iter().map(|error| (error, entry.source_info));
-                        errors.extend(new_errors);
-                    }
-                }
+            let is_effective = match next_entries.next() {
+                None => true,
+                Some(next) => next.entry_index != entry.entry_index,
+            };
+            if is_effective {
+                let new_errors = entry
+                    .errors
+                    .iter()
+                    .map(|error| (error, entry.source_info, entry.source.as_ref()));
+                errors.extend(new_errors);
             }
         }
         errors
     }
+}
+
+/// Source (file and content) an [`EntryResult`] was executed from, when it differs from the
+/// top-level run file. This is set for entries run from an included sub-script (see `INCLUDE`) so
+/// that reports and errors point at the real sub-file and line.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EntrySource {
+    pub filename: Input,
+    pub content: String,
 }
 
 /// Represents the execution result of an entry.
@@ -104,6 +123,9 @@ pub struct EntryResult {
     pub compressed: bool,
     /// The debug curl command line from this entry result.
     pub curl_cmd: CurlCmd,
+    /// Source (file and content) this entry was run from, when it differs from the top-level run
+    /// file (i.e. for entries coming from an included sub-script). `None` for top-level entries.
+    pub source: Option<EntrySource>,
 }
 
 impl Default for EntryResult {
@@ -118,6 +140,7 @@ impl Default for EntryResult {
             transfer_duration: Duration::from_millis(0),
             compressed: false,
             curl_cmd: CurlCmd::default(),
+            source: None,
         }
     }
 }

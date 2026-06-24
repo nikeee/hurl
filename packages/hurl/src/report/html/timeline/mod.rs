@@ -86,7 +86,11 @@ impl Testcase {
     }
 
     /// Constructs a list of call contexts to record source line code, runtime entry and call indices.
-    fn get_call_contexts(&self, hurl_file: &HurlFile, entries: &[EntryResult]) -> Vec<CallContext> {
+    fn get_call_contexts(
+        &self,
+        _hurl_file: &HurlFile,
+        entries: &[EntryResult],
+    ) -> Vec<CallContext> {
         let mut calls_ctx = vec![];
 
         for (entry_index, e) in entries.iter().enumerate() {
@@ -101,9 +105,7 @@ impl Testcase {
                 (false, false) => CallContextKind::Failure,
             };
             for (call_entry_index, _) in e.calls.iter().enumerate() {
-                let entry_src_index = e.entry_index.to_zero_based();
-                let entry_src = hurl_file.entries.get(entry_src_index).unwrap();
-                let line = Index::new(entry_src.source_info().start.line);
+                let line = Index::new(e.source_info.start.line);
                 let ctx = CallContext {
                     kind,
                     line,

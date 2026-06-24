@@ -27,7 +27,7 @@ impl Testcase {
     /// Creates an HTML view of a run (HTTP status code, response header etc...)
     pub fn get_run_html(
         &self,
-        hurl_file: &HurlFile,
+        _hurl_file: &HurlFile,
         content: &str,
         entries: &[EntryResult],
         secrets: &[&str],
@@ -38,9 +38,7 @@ impl Testcase {
 
         let mut run = String::new();
         for (entry_index, e) in entries.iter().enumerate() {
-            let entry_src_index = e.entry_index.to_zero_based();
-            let entry_src = hurl_file.entries.get(entry_src_index).unwrap();
-            let line = entry_src.source_info().start.line;
+            let line = e.source_info.start.line;
             let source = self.source_filename();
 
             run.push_str("<details open>");

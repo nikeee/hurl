@@ -19,11 +19,11 @@ use base64::Engine;
 use base64::engine::general_purpose;
 use hurl_core::ast::{
     Assert, Base64, Body, BooleanOption, Bytes, Capture, CertificateAttributeName, Comment, Cookie,
-    CountOption, Duration, DurationOption, Entry, EntryOption, File, FilenameParam, Filter,
-    FilterValue, Hex, HurlFile, JsonListElement, JsonValue, KeyValue, MultilineString,
-    MultilineStringKind, MultipartParam, NaturalOption, OptionKind, Placeholder, Predicate,
-    PredicateFuncValue, PredicateValue, Query, QueryValue, Regex, RegexValue, Request, Response,
-    StatusValue, VersionValue,
+    CountOption, Duration, DurationOption, Entry, EntryKind, EntryOption, File, FilenameParam,
+    Filter, FilterValue, Hex, HurlFile, Include, IncludeCapture, JsonListElement, JsonValue,
+    KeyValue, MultilineString, MultilineStringKind, MultipartParam, NaturalOption, OptionKind,
+    Placeholder, Predicate, PredicateFuncValue, PredicateValue, Query, QueryValue, Regex,
+    RegexValue, Request, Response, StatusValue, VersionValue,
 };
 use hurl_core::types::{Count, ToSource};
 
@@ -43,6 +43,45 @@ impl ToJson for HurlFile {
             "entries".to_string(),
             JValue::List(self.entries.iter().map(|e| e.to_json()).collect()),
         )])
+    }
+}
+
+impl ToJson for EntryKind {
+    fn to_json(&self) -> JValue {
+        match self {
+            EntryKind::Request(entry) => entry.to_json(),
+            EntryKind::Include(include) => include.to_json(),
+        }
+    }
+}
+
+impl ToJson for Include {
+    fn to_json(&self) -> JValue {
+        let mut attributes = vec![
+            ("type".to_string(), JValue::String("include".to_string())),
+            ("path".to_string(), JValue::String(self.path.to_string())),
+        ];
+        if !self.variables().is_empty() {
+            let vars = self.variables().iter().map(|kv| kv.to_json()).collect();
+            attributes.push(("variables".to_string(), JValue::List(vars)));
+        }
+        if !self.captures().is_empty() {
+            let caps = self.captures().iter().map(|c| c.to_json()).collect();
+            attributes.push(("captures".to_string(), JValue::List(caps)));
+        }
+        JValue::Object(attributes)
+    }
+}
+
+impl ToJson for IncludeCapture {
+    fn to_json(&self) -> JValue {
+        JValue::Object(vec![
+            ("name".to_string(), JValue::String(self.name.to_string())),
+            (
+                "target".to_string(),
+                JValue::String(self.target.to_string()),
+            ),
+        ])
     }
 }
 

@@ -3,8 +3,28 @@
 hurl-file: entry*
            lt*
 
-entry: request
-       response?
+entry: request response?
+     | include
+
+include:
+  lt*
+  "INCLUDE" sp value-string lt
+  include-variables-section?
+  include-captures-section?
+
+include-variables-section:
+  lt*
+  "[Variables]" lt
+  key-value*
+
+include-captures-section:
+  lt*
+  "[Captures]" lt
+  include-capture*
+
+include-capture:
+  lt*
+  key-string ":" key-string lt
 
 request:
   lt*

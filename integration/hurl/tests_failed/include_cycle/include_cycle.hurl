@@ -1,0 +1,1 @@
+INCLUDE include_cycle_b.hurl

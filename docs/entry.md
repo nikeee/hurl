@@ -7,6 +7,8 @@ A Hurl file is a list of entries, each entry being a mandatory [request], option
 Responses are not mandatory, a Hurl file consisting only of requests is perfectly valid. To sum up, responses can be used
 to [capture values] to perform subsequent requests, or [add asserts to HTTP responses].
 
+A file can also reuse another Hurl file as an isolated sub-script with the [`INCLUDE` directive].
+
 ## Example
 
 ```hurl
@@ -234,6 +236,7 @@ For complete reference, below is a diagram for the executed entries.
 
 [request]: /docs/request.md
 [response]: /docs/response.md
+[`INCLUDE` directive]: /docs/include.md
 [capture values]: /docs/capturing-response.md
 [add asserts to HTTP responses]: /docs/asserting-response.md
 [`--location`]: /docs/manual.md#location

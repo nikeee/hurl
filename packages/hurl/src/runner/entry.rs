@@ -169,6 +169,7 @@ pub fn run(
                 transfer_duration,
                 compressed,
                 curl_cmd,
+                source: None,
             };
         }
     };
@@ -195,6 +196,7 @@ pub fn run(
                         transfer_duration,
                         compressed,
                         curl_cmd,
+                        source: None,
                     };
                 }
             }
@@ -236,6 +238,7 @@ pub fn run(
         transfer_duration,
         compressed,
         curl_cmd,
+        source: None,
     }
 }
 

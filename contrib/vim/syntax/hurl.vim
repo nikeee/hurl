@@ -6,6 +6,7 @@ if exists("b:current_syntax")
 endif
 
 syntax keyword method GET POST PUT DELETE CONNECT OPTIONS TRACE PATCH LINK UNLINK PURGE LOCK UNLOCK PROPFIND VIEW nextgroup=url skipwhite
+syntax keyword include INCLUDE nextgroup=url skipwhite
 syntax match url "\S\+" contained
 syntax match version "HTTP" nextgroup=status skipwhite
 syntax match version "HTTP/1\.0" nextgroup=status skipwhite
@@ -21,6 +22,7 @@ syntax match section "\[FormParams\]"
 syntax match section "\[Multipart\]"
 syntax match section "\[MultipartFormData\]"
 syntax match section "\[Cookies\]"
+syntax match section "\[Variables\]"
 syntax match section "\[Captures\]"
 syntax match section "\[Asserts\]"
 syntax match section "\[Options\]"
@@ -42,6 +44,7 @@ syntax region template start='{{' end='}}'
 
 highlight def link comment Comment
 highlight def link method Statement
+highlight def link include Statement
 highlight def link url Underlined
 highlight def link version Statement
 highlight def link status Number

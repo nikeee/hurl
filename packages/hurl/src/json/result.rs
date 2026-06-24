@@ -75,6 +75,10 @@ struct HurlResultJson {
 #[derive(Deserialize, Serialize)]
 struct EntryResultJson {
     index: usize,
+    /// Source file of this entry, when it differs from the run file (i.e. for entries coming from
+    /// an included sub-script). Absent for top-level entries.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    filename: Option<String>,
     line: usize,
     calls: Vec<CallJson>,
     captures: Vec<CaptureJson>,
@@ -251,6 +255,12 @@ impl EntryResultJson {
             .iter()
             .map(|c| CaptureJson::from_capture(c, secrets))
             .collect::<Vec<_>>();
+        // Entries coming from an included sub-script carry their own source: assert messages and
+        // line numbers must be rendered against that sub-file, not the run file.
+        let (content, filename) = match &entry.source {
+            Some(source) => (source.content.as_str(), &source.filename),
+            None => (content, filename),
+        };
         let asserts = entry
             .asserts
             .iter()
@@ -258,6 +268,7 @@ impl EntryResultJson {
             .collect::<Vec<_>>();
         Ok(EntryResultJson {
             index: entry.entry_index.get(),
+            filename: entry.source.as_ref().map(|s| s.filename.to_string()),
             line: entry.source_info.start.line,
             calls,
             captures,

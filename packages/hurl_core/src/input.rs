@@ -58,6 +58,14 @@ impl Input {
     pub fn read_to_string(&self) -> Result<String, io::Error> {
         self.kind.read_to_string()
     }
+
+    /// Returns the file path of this input, or `None` if the input is standard input.
+    pub fn path(&self) -> Option<&Path> {
+        match &self.kind {
+            InputKind::File(path) => Some(path),
+            InputKind::Stdin(_) => None,
+        }
+    }
 }
 
 /// Represents the kind of input of read operation.

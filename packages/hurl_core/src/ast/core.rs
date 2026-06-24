@@ -28,8 +28,27 @@ use super::section::{Assert, Capture, Cookie, MultipartParam, RegexValue, Sectio
 /// Represents Hurl AST root node.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HurlFile {
-    pub entries: Vec<Entry>,
+    pub entries: Vec<EntryKind>,
     pub line_terminators: Vec<LineTerminator>,
+}
+
+/// Represents a top-level item of a Hurl file: either a request/response [`Entry`] or an
+/// [`Include`] directive that runs another Hurl file as an isolated sub-script.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[allow(clippy::large_enum_variant)]
+pub enum EntryKind {
+    Request(Entry),
+    Include(Include),
+}
+
+impl EntryKind {
+    /// Returns the source information for this top-level item.
+    pub fn source_info(&self) -> SourceInfo {
+        match self {
+            EntryKind::Request(entry) => entry.source_info(),
+            EntryKind::Include(include) => include.source_info,
+        }
+    }
 }
 
 /// Represents an entry; a request AST specification to be run and an optional response AST
@@ -45,6 +64,71 @@ impl Entry {
     pub fn source_info(&self) -> SourceInfo {
         self.request.space0.source_info
     }
+}
+
+/// Represents an `INCLUDE` directive: it runs another Hurl file as an isolated sub-script.
+///
+/// The sub-script is executed in a fresh, isolated environment: its variables are seeded only by
+/// the (optional) `[Variables]` section, it uses its own HTTP client (cookie store), and only the
+/// variables listed in the (optional) `[Captures]` section are copied back into the parent (under
+/// their renamed name).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Include {
+    pub line_terminators: Vec<LineTerminator>,
+    pub space0: Whitespace,
+    pub space1: Whitespace,
+    pub path: Template,
+    pub line_terminator0: LineTerminator,
+    pub variables: Option<IncludeVariablesSection>,
+    pub captures: Option<IncludeCapturesSection>,
+    pub source_info: SourceInfo,
+}
+
+impl Include {
+    /// Returns the variables passed to the sub-script (empty if there is no `[Variables]` section).
+    pub fn variables(&self) -> &[KeyValue] {
+        self.variables.as_ref().map_or(&[], |s| &s.items)
+    }
+
+    /// Returns the captures promoted from the sub-script to the parent (empty if there is no
+    /// `[Captures]` section).
+    pub fn captures(&self) -> &[IncludeCapture] {
+        self.captures.as_ref().map_or(&[], |s| &s.items)
+    }
+}
+
+/// The `[Variables]` section of an [`Include`]: inputs seeded into the sub-script environment.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct IncludeVariablesSection {
+    pub line_terminators: Vec<LineTerminator>,
+    pub space0: Whitespace,
+    pub line_terminator0: LineTerminator,
+    pub items: Vec<KeyValue>,
+    pub source_info: SourceInfo,
+}
+
+/// The `[Captures]` section of an [`Include`]: a rename map promoting sub-script variables back
+/// into the parent.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct IncludeCapturesSection {
+    pub line_terminators: Vec<LineTerminator>,
+    pub space0: Whitespace,
+    pub line_terminator0: LineTerminator,
+    pub items: Vec<IncludeCapture>,
+    pub source_info: SourceInfo,
+}
+
+/// A single rename entry of an [`Include`] `[Captures]` section: `name: target` where `name` is a
+/// variable defined in the sub-script and `target` is the name it takes in the parent.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct IncludeCapture {
+    pub line_terminators: Vec<LineTerminator>,
+    pub space0: Whitespace,
+    pub name: Template,
+    pub space1: Whitespace,
+    pub space2: Whitespace,
+    pub target: Template,
+    pub line_terminator0: LineTerminator,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

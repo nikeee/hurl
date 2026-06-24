@@ -17,12 +17,12 @@
  */
 use hurl_core::ast::{
     Assert, Base64, Body, BooleanOption, Bytes, Capture, CertificateAttributeName, Comment, Cookie,
-    CookiePath, CountOption, Duration, DurationOption, Entry, EntryOption, File, FilenameParam,
-    FilenameValue, FilterValue, Hex, HurlFile, I64, IntegerValue, JsonValue, KeyValue,
-    LineTerminator, Method, MultilineString, MultipartParam, NaturalOption, Number, OptionKind,
-    Placeholder, Predicate, PredicateFuncValue, PredicateValue, Query, QueryValue, Regex,
-    RegexValue, Request, Response, Section, SectionValue, StatusValue, Template, U64,
-    VariableDefinition, VariableValue, VerbosityOption, VersionValue,
+    CookiePath, CountOption, Duration, DurationOption, Entry, EntryKind, EntryOption, File,
+    FilenameParam, FilenameValue, FilterValue, Hex, HurlFile, I64, Include, IncludeCapture,
+    IntegerValue, JsonValue, KeyValue, LineTerminator, Method, MultilineString, MultipartParam,
+    NaturalOption, Number, OptionKind, Placeholder, Predicate, PredicateFuncValue, PredicateValue,
+    Query, QueryValue, Regex, RegexValue, Request, Response, Section, SectionValue, StatusValue,
+    Template, U64, VariableDefinition, VariableValue, VerbosityOption, VersionValue,
 };
 use hurl_core::types::{Count, DurationUnit, ToSource};
 
@@ -353,6 +353,60 @@ impl Lint for HurlFile {
         self.line_terminators
             .iter()
             .for_each(|lt| s.push_str(&lint_lt(lt, false)));
+        s
+    }
+}
+
+impl Lint for EntryKind {
+    fn lint(&self) -> String {
+        match self {
+            EntryKind::Request(entry) => entry.lint(),
+            EntryKind::Include(include) => include.lint(),
+        }
+    }
+}
+
+impl Lint for Include {
+    fn lint(&self) -> String {
+        let mut s = String::new();
+        self.line_terminators
+            .iter()
+            .for_each(|lt| s.push_str(&lint_lt(lt, false)));
+        s.push_str("INCLUDE ");
+        s.push_str(&self.path.lint());
+        s.push_str(&lint_lt(&self.line_terminator0, true));
+        if let Some(section) = &self.variables {
+            section
+                .line_terminators
+                .iter()
+                .for_each(|lt| s.push_str(&lint_lt(lt, false)));
+            s.push_str("[Variables]");
+            s.push_str(&lint_lt(&section.line_terminator0, true));
+            section.items.iter().for_each(|kv| s.push_str(&kv.lint()));
+        }
+        if let Some(section) = &self.captures {
+            section
+                .line_terminators
+                .iter()
+                .for_each(|lt| s.push_str(&lint_lt(lt, false)));
+            s.push_str("[Captures]");
+            s.push_str(&lint_lt(&section.line_terminator0, true));
+            section.items.iter().for_each(|c| s.push_str(&c.lint()));
+        }
+        s
+    }
+}
+
+impl Lint for IncludeCapture {
+    fn lint(&self) -> String {
+        let mut s = String::new();
+        self.line_terminators
+            .iter()
+            .for_each(|lt| s.push_str(&lint_lt(lt, false)));
+        s.push_str(&self.name.lint());
+        s.push_str(": ");
+        s.push_str(&self.target.lint());
+        s.push_str(&lint_lt(&self.line_terminator0, true));
         s
     }
 }

@@ -17,8 +17,8 @@
  */
 use crate::ast::VersionValue::VersionAny;
 use crate::ast::{
-    Body, Entry, HurlFile, Method, Request, Response, Section, SourceInfo, Status, StatusValue,
-    Version, VersionValue,
+    Body, Entry, EntryKind, HurlFile, Method, Request, Response, Section, SourceInfo, Status,
+    StatusValue, Version, VersionValue,
 };
 use crate::combinator::{optional, zero_or_more};
 use crate::parser::bytes::bytes;
@@ -26,19 +26,34 @@ use crate::parser::primitives::{
     eof, key_value, line_terminator, one_or_more_spaces, optional_line_terminators, try_literal,
     zero_or_more_spaces,
 };
-use crate::parser::sections::{request_sections, response_sections};
+use crate::parser::sections::{include, request_sections, response_sections};
 use crate::parser::string::unquoted_template;
 use crate::parser::{ParseError, ParseErrorKind, ParseResult};
 use crate::reader::Reader;
 
 pub fn hurl_file(reader: &mut Reader) -> ParseResult<HurlFile> {
-    let entries = zero_or_more(entry, reader)?;
+    let entries = zero_or_more(entry_kind, reader)?;
     let line_terminators = optional_line_terminators(reader)?;
     eof(reader)?;
     Ok(HurlFile {
         entries,
         line_terminators,
     })
+}
+
+/// Parses a top-level item: an `INCLUDE` directive if the line starts with `INCLUDE `, otherwise a
+/// regular request/response entry.
+fn entry_kind(reader: &mut Reader) -> ParseResult<EntryKind> {
+    let save = reader.cursor();
+    match include(reader) {
+        Ok(inc) => Ok(EntryKind::Include(inc)),
+        Err(e) if e.recoverable => {
+            reader.seek(save);
+            let entry = entry(reader)?;
+            Ok(EntryKind::Request(entry))
+        }
+        Err(e) => Err(e),
+    }
 }
 
 fn entry(reader: &mut Reader) -> ParseResult<Entry> {
@@ -231,6 +246,31 @@ mod tests {
         let mut reader = Reader::new("GET http://google.fr");
         let hurl_file = hurl_file(&mut reader).unwrap();
         assert_eq!(hurl_file.entries.len(), 1);
+        assert!(matches!(hurl_file.entries[0], EntryKind::Request(_)));
+    }
+
+    #[test]
+    fn test_hurl_file_with_include() {
+        let mut reader = Reader::new(
+            "GET http://google.fr\nHTTP 200\n\nINCLUDE ./other.hurl\n[Captures]\ntoken: admin_token\n\nGET http://google.fr\n",
+        );
+        let hurl_file = hurl_file(&mut reader).unwrap();
+        assert_eq!(hurl_file.entries.len(), 3);
+        assert!(matches!(hurl_file.entries[0], EntryKind::Request(_)));
+        assert!(matches!(hurl_file.entries[1], EntryKind::Include(_)));
+        assert!(matches!(hurl_file.entries[2], EntryKind::Request(_)));
+    }
+
+    #[test]
+    fn test_hurl_file_include_does_not_shadow_custom_method() {
+        // `INCLUDED` is a custom HTTP method and must parse as a request, not an include.
+        let mut reader = Reader::new("INCLUDED http://google.fr\n");
+        let hurl_file = hurl_file(&mut reader).unwrap();
+        assert_eq!(hurl_file.entries.len(), 1);
+        match &hurl_file.entries[0] {
+            EntryKind::Request(e) => assert_eq!(e.request.method, Method::new("INCLUDED")),
+            EntryKind::Include(_) => panic!("expected a request entry"),
+        }
     }
 
     #[test]

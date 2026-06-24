@@ -22,12 +22,12 @@
 //! Code heavily inspired from <https://github.com/rust-lang/rust/blob/master/compiler/rustc_ast/src/visit.rs>
 use crate::ast::{
     Assert, Base64, Body, BooleanOption, Bytes, Capture, Comment, Cookie, CookiePath, CountOption,
-    Duration, DurationOption, Entry, EntryOption, File, FilenameParam, FilenameValue, Filter,
-    FilterValue, Hex, HurlFile, IntegerValue, JsonValue, KeyValue, LineTerminator, Method,
-    MultilineString, MultipartParam, NaturalOption, Number, OptionKind, Placeholder, Predicate,
-    PredicateFuncValue, PredicateValue, Query, QueryValue, Regex, RegexValue, Request, Response,
-    Section, SectionValue, StatusValue, Template, U64, VariableDefinition, VariableValue,
-    VerbosityOption, VersionValue, Whitespace,
+    Duration, DurationOption, Entry, EntryKind, EntryOption, File, FilenameParam, FilenameValue,
+    Filter, FilterValue, Hex, HurlFile, Include, IncludeCapture, IntegerValue, JsonValue, KeyValue,
+    LineTerminator, Method, MultilineString, MultipartParam, NaturalOption, Number, OptionKind,
+    Placeholder, Predicate, PredicateFuncValue, PredicateValue, Query, QueryValue, Regex,
+    RegexValue, Request, Response, Section, SectionValue, StatusValue, Template, U64,
+    VariableDefinition, VariableValue, VerbosityOption, VersionValue, Whitespace,
 };
 use crate::types::{Count, DurationUnit, SourceString, ToSource};
 
@@ -92,6 +92,14 @@ pub trait Visitor: Sized {
 
     fn visit_entry_option(&mut self, option: &EntryOption) {
         walk_entry_option(self, option);
+    }
+
+    fn visit_include(&mut self, include: &Include) {
+        walk_include(self, include);
+    }
+
+    fn visit_include_capture(&mut self, capture: &IncludeCapture) {
+        walk_include_capture(self, capture);
     }
 
     fn visit_file(&mut self, file: &File) {
@@ -350,6 +358,51 @@ pub fn walk_entry<V: Visitor>(visitor: &mut V, entry: &Entry) {
     }
 }
 
+pub fn walk_include<V: Visitor>(visitor: &mut V, include: &Include) {
+    include.line_terminators.iter().for_each(|lt| {
+        visitor.visit_lt(lt);
+    });
+    visitor.visit_whitespace(&include.space0);
+    visitor.visit_literal("INCLUDE");
+    visitor.visit_whitespace(&include.space1);
+    visitor.visit_url(&include.path);
+    visitor.visit_lt(&include.line_terminator0);
+    if let Some(section) = &include.variables {
+        section.line_terminators.iter().for_each(|lt| {
+            visitor.visit_lt(lt);
+        });
+        visitor.visit_whitespace(&section.space0);
+        visitor.visit_section_header("[Variables]");
+        visitor.visit_lt(&section.line_terminator0);
+        section.items.iter().for_each(|kv| visitor.visit_kv(kv));
+    }
+    if let Some(section) = &include.captures {
+        section.line_terminators.iter().for_each(|lt| {
+            visitor.visit_lt(lt);
+        });
+        visitor.visit_whitespace(&section.space0);
+        visitor.visit_section_header("[Captures]");
+        visitor.visit_lt(&section.line_terminator0);
+        section
+            .items
+            .iter()
+            .for_each(|c| visitor.visit_include_capture(c));
+    }
+}
+
+pub fn walk_include_capture<V: Visitor>(visitor: &mut V, capture: &IncludeCapture) {
+    capture.line_terminators.iter().for_each(|lt| {
+        visitor.visit_lt(lt);
+    });
+    visitor.visit_whitespace(&capture.space0);
+    visitor.visit_template(&capture.name);
+    visitor.visit_whitespace(&capture.space1);
+    visitor.visit_literal(":");
+    visitor.visit_whitespace(&capture.space2);
+    visitor.visit_template(&capture.target);
+    visitor.visit_lt(&capture.line_terminator0);
+}
+
 pub fn walk_entry_option<V: Visitor>(visitor: &mut V, option: &EntryOption) {
     option.line_terminators.iter().for_each(|lt| {
         visitor.visit_lt(lt);
@@ -552,7 +605,10 @@ pub fn walk_hex<V: Visitor>(visitor: &mut V, hex: &Hex) {
 }
 
 pub fn walk_hurl_file<V: Visitor>(visitor: &mut V, file: &HurlFile) {
-    file.entries.iter().for_each(|e| visitor.visit_entry(e));
+    file.entries.iter().for_each(|e| match e {
+        EntryKind::Request(entry) => visitor.visit_entry(entry),
+        EntryKind::Include(include) => visitor.visit_include(include),
+    });
     file.line_terminators.iter().for_each(|lt| {
         visitor.visit_lt(lt);
     });

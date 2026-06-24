@@ -103,6 +103,22 @@ pub enum RunnerErrorKind {
     FilterInvalidFormatSpecifier(String),
     FilterMissingInput,
     Http(HttpError),
+    /// A circular `INCLUDE` reference has been detected on `path`.
+    IncludeCycle {
+        path: PathBuf,
+    },
+    /// The included Hurl file `path` can not be read.
+    IncludeFileRead {
+        path: PathBuf,
+    },
+    /// The included Hurl file can not be parsed.
+    IncludeParse {
+        message: String,
+    },
+    /// An `INCLUDE` `[Captures]` entry refers to a variable `name` not defined by the sub-script.
+    IncludeMissingCapture {
+        name: String,
+    },
     InvalidJson {
         value: String,
     },
@@ -169,6 +185,10 @@ impl DisplaySourceError for RunnerError {
             RunnerErrorKind::FilterInvalidFormatSpecifier { .. } => "Filter error".to_string(),
             RunnerErrorKind::FilterMissingInput => "Filter error".to_string(),
             RunnerErrorKind::Http(http_error) => http_error.description(),
+            RunnerErrorKind::IncludeCycle { .. } => "Include cycle".to_string(),
+            RunnerErrorKind::IncludeFileRead { .. } => "Include file read access".to_string(),
+            RunnerErrorKind::IncludeParse { .. } => "Include parsing".to_string(),
+            RunnerErrorKind::IncludeMissingCapture { .. } => "Include capture".to_string(),
             RunnerErrorKind::InvalidJson { .. } => "Invalid JSON".to_string(),
             RunnerErrorKind::InvalidOptionValue { .. } => "Invalid option value".to_string(),
             RunnerErrorKind::InvalidRegex => "Invalid regex".to_string(),
@@ -299,6 +319,29 @@ impl DisplaySourceError for RunnerError {
             RunnerErrorKind::Http(http_error) => {
                 let message = http_error.message();
                 let message = error::add_carets(&message, self.source_info, content);
+                color_red_multiline_string(&message)
+            }
+            RunnerErrorKind::IncludeCycle { path } => {
+                let message = &format!(
+                    "circular include detected on file {}",
+                    path.to_string_lossy()
+                );
+                let message = error::add_carets(message, self.source_info, content);
+                color_red_multiline_string(&message)
+            }
+            RunnerErrorKind::IncludeFileRead { path } => {
+                let message = &format!("included file {} can not be read", path.to_string_lossy());
+                let message = error::add_carets(message, self.source_info, content);
+                color_red_multiline_string(&message)
+            }
+            RunnerErrorKind::IncludeParse { message } => {
+                let message = &format!("included file can not be parsed: {message}");
+                let message = error::add_carets(message, self.source_info, content);
+                color_red_multiline_string(&message)
+            }
+            RunnerErrorKind::IncludeMissingCapture { name } => {
+                let message = &format!("the sub-script did not define the variable {name}");
+                let message = error::add_carets(message, self.source_info, content);
                 color_red_multiline_string(&message)
             }
             RunnerErrorKind::InvalidJson { value } => {

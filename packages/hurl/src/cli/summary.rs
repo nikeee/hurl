@@ -98,6 +98,7 @@ pub mod tests {
                 transfer_duration: Duration::from_millis(0),
                 compressed: false,
                 curl_cmd: CurlCmd::default(),
+                source: None,
             };
             HurlRun {
                 content: String::new(),

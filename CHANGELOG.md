@@ -14,6 +14,7 @@ Thanks to
 
 Enhancements:
 
+* Add INCLUDE directive to run another Hurl file as an isolated sub-script [#115](https://github.com/Orange-OpenSource/hurl/issues/115)
 * Add --no-header option to remove specific HTTP header [#4884](https://github.com/Orange-OpenSource/hurl/issues/4884)
 * Add --fail-with-body option to output response body when there are errors [#4776](https://github.com/Orange-OpenSource/hurl/issues/4776)
 * Add no jsonpath coercion option  [#5077](https://github.com/Orange-OpenSource/hurl/issues/5077)

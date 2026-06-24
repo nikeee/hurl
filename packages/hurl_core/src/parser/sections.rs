@@ -16,7 +16,8 @@
  *
  */
 use crate::ast::{
-    Assert, Capture, Cookie, FilenameParam, FilenameValue, MultipartParam, Section, SectionValue,
+    Assert, Capture, Cookie, FilenameParam, FilenameValue, Include, IncludeCapture,
+    IncludeCapturesSection, IncludeVariablesSection, MultipartParam, Section, SectionValue,
     SourceInfo, Whitespace,
 };
 use crate::combinator::{optional, recover, zero_or_more};
@@ -39,6 +40,114 @@ pub fn request_sections(reader: &mut Reader) -> ParseResult<Vec<Section>> {
 pub fn response_sections(reader: &mut Reader) -> ParseResult<Vec<Section>> {
     let sections = zero_or_more(response_section, reader)?;
     Ok(sections)
+}
+
+/// Parses an `INCLUDE` directive: `INCLUDE <path>` optionally followed by a `[Variables]` and a
+/// `[Captures]` section.
+///
+/// The initial `INCLUDE` keyword (and the mandatory space after it) is parsed recoverably so the
+/// caller can fall back to a regular request entry when the line does not start with `INCLUDE `
+/// (e.g. a custom HTTP method such as `INCLUDED`).
+pub fn include(reader: &mut Reader) -> ParseResult<Include> {
+    let start = reader.cursor();
+    let line_terminators = optional_line_terminators(reader)?;
+    let space0 = zero_or_more_spaces(reader)?;
+    try_literal("INCLUDE", reader)?;
+    // Require at least one space after the keyword. If there is none, the line is not an include
+    // directive (e.g. a custom HTTP method such as `INCLUDED`), so we fail recoverably to let the
+    // caller fall back to a regular request entry. (`one_or_more_spaces` would fail
+    // non-recoverably here, preventing that fallback.)
+    if !matches!(reader.peek(), Some(' ') | Some('\t')) {
+        let kind = ParseErrorKind::Expecting {
+            value: "space".to_string(),
+        };
+        return Err(ParseError::new(reader.cursor().pos, true, kind));
+    }
+    let space1 = one_or_more_spaces(reader)?;
+    let path = unquoted_template(reader)?;
+    let line_terminator0 = line_terminator(reader)?;
+    let variables = optional(include_variables_section, reader)?;
+    let captures = optional(include_captures_section, reader)?;
+    let source_info = SourceInfo::new(start.pos, reader.cursor().pos);
+    Ok(Include {
+        line_terminators,
+        space0,
+        space1,
+        path,
+        line_terminator0,
+        variables,
+        captures,
+        source_info,
+    })
+}
+
+fn include_variables_section(reader: &mut Reader) -> ParseResult<IncludeVariablesSection> {
+    let line_terminators = optional_line_terminators(reader)?;
+    let space0 = zero_or_more_spaces(reader)?;
+    let start = reader.cursor();
+    let name = section_name(reader)?;
+    if name != "Variables" {
+        let kind = ParseErrorKind::Expecting {
+            value: "[Variables]".to_string(),
+        };
+        return Err(ParseError::new(start.pos, true, kind));
+    }
+    let source_info = SourceInfo::new(start.pos, reader.cursor().pos);
+    let line_terminator0 = line_terminator(reader)?;
+    let items = zero_or_more(key_value, reader)?;
+    Ok(IncludeVariablesSection {
+        line_terminators,
+        space0,
+        line_terminator0,
+        items,
+        source_info,
+    })
+}
+
+fn include_captures_section(reader: &mut Reader) -> ParseResult<IncludeCapturesSection> {
+    let line_terminators = optional_line_terminators(reader)?;
+    let space0 = zero_or_more_spaces(reader)?;
+    let start = reader.cursor();
+    let name = section_name(reader)?;
+    if name != "Captures" {
+        let kind = ParseErrorKind::Expecting {
+            value: "[Captures]".to_string(),
+        };
+        return Err(ParseError::new(start.pos, true, kind));
+    }
+    let source_info = SourceInfo::new(start.pos, reader.cursor().pos);
+    let line_terminator0 = line_terminator(reader)?;
+    let items = zero_or_more(include_capture, reader)?;
+    Ok(IncludeCapturesSection {
+        line_terminators,
+        space0,
+        line_terminator0,
+        items,
+        source_info,
+    })
+}
+
+/// Parses a single `[Captures]` rename entry of an [`Include`]: `name: target` where both `name`
+/// (the variable defined in the sub-script) and `target` (its name in the parent) are bare
+/// identifiers.
+fn include_capture(reader: &mut Reader) -> ParseResult<IncludeCapture> {
+    let line_terminators = optional_line_terminators(reader)?;
+    let space0 = zero_or_more_spaces(reader)?;
+    let name = recover(key_string::parse, reader)?;
+    let space1 = zero_or_more_spaces(reader)?;
+    recover(|p1| literal(":", p1), reader)?;
+    let space2 = zero_or_more_spaces(reader)?;
+    let target = key_string::parse(reader)?;
+    let line_terminator0 = line_terminator(reader)?;
+    Ok(IncludeCapture {
+        line_terminators,
+        space0,
+        name,
+        space1,
+        space2,
+        target,
+        line_terminator0,
+    })
 }
 
 fn request_section(reader: &mut Reader) -> ParseResult<Section> {
@@ -881,6 +990,45 @@ mod tests {
                 },
             }
         );
+    }
+
+    #[test]
+    fn test_include_simple() {
+        let mut reader = Reader::new("INCLUDE ./login.hurl\n");
+        let inc = include(&mut reader).unwrap();
+        assert_eq!(inc.path.to_string(), "./login.hurl");
+        assert!(inc.variables().is_empty());
+        assert!(inc.captures().is_empty());
+    }
+
+    #[test]
+    fn test_include_with_variables_and_captures() {
+        let mut reader = Reader::new(
+            "INCLUDE ./login.hurl\n[Variables]\nusername: admin\npassword: {{secret}}\n[Captures]\ncookie: admin_cookie\n",
+        );
+        let inc = include(&mut reader).unwrap();
+        assert_eq!(inc.path.to_string(), "./login.hurl");
+
+        let variables = inc.variables();
+        assert_eq!(variables.len(), 2);
+        assert_eq!(variables[0].key.to_string(), "username");
+        assert_eq!(variables[0].value.to_string(), "admin");
+        assert_eq!(variables[1].key.to_string(), "password");
+        assert_eq!(variables[1].value.to_string(), "{{secret}}");
+
+        let captures = inc.captures();
+        assert_eq!(captures.len(), 1);
+        assert_eq!(captures[0].name.to_string(), "cookie");
+        assert_eq!(captures[0].target.to_string(), "admin_cookie");
+    }
+
+    #[test]
+    fn test_include_keyword_is_recoverable() {
+        // `INCLUDED` is a valid (custom) HTTP method, not an include directive: the `INCLUDE`
+        // keyword parser must fail recoverably so the caller can fall back to a request entry.
+        let mut reader = Reader::new("INCLUDED https://example.com\n");
+        let error = include(&mut reader).err().unwrap();
+        assert!(error.recoverable);
     }
 
     #[test]

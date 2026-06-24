@@ -40,7 +40,13 @@ impl Testcase {
         let mut failures = vec![];
         let mut errors = vec![];
 
-        for (error, entry_src_info) in hurl_result.errors() {
+        for (error, entry_src_info, entry_source) in hurl_result.errors_with_source() {
+            // Errors coming from an included sub-script are rendered against the sub-file source
+            // (name and content) so the failure points at the real file and line.
+            let (name, content) = match entry_source {
+                Some(source) => (source.filename.to_string(), source.content.as_str()),
+                None => (name.clone(), content),
+            };
             let message = error.render(
                 &name,
                 content,

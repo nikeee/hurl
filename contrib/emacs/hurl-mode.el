@@ -53,6 +53,7 @@ If the value of this variable is non-nil, whenever a word in
    "OPTIONS"
    "TRACE"
    "PATCH"
+   "INCLUDE"
    "header"
    "status"
    "jsonpath"

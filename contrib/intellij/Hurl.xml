@@ -8,9 +8,9 @@
             <option name="NUM_POSTFIXES" value="" />
         </options>
         <!-- Most used methods -->
-        <keywords keywords="GET;HEAD;POST;PUT;DELETE;CONNECT;DELETE;OPTIONS;TRACE;PATCH;LINK;UNLINK;PURGE;LOCK;UNLOCK;PROPFIND;VIEW" ignore_case="false" />
+        <keywords keywords="GET;HEAD;POST;PUT;DELETE;CONNECT;DELETE;OPTIONS;TRACE;PATCH;LINK;UNLINK;PURGE;LOCK;UNLOCK;PROPFIND;VIEW;INCLUDE" ignore_case="false" />
         <!-- All sections -->
-        <keywords2 keywords="[Asserts];[BasicAuth];[Captures];[Cookies];[Form];[FormParams];[Multipart];[MultipartFormData];[Query];[QueryStringParams];[Options]" ignore_case="false" />
+        <keywords2 keywords="[Asserts];[BasicAuth];[Captures];[Cookies];[Form];[FormParams];[Multipart];[MultipartFormData];[Query];[QueryStringParams];[Options];[Variables]" ignore_case="false" />
         <!-- Queries -->
         <keywords3 keywords="body;bytes;certificate;cookie;duration;header;ip;jsonpath;md5;redirects;regex;sha256;status;url;variable;version;xpath;HTTP;HTTP/1.0;HTTP/1.1;HTTP/2"  ignore_case="false"/>
         <!-- Predicates and filters -->

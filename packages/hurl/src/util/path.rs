@@ -49,9 +49,26 @@ impl ContextDir {
         }
     }
 
+    /// Returns the current working directory of this context.
+    pub fn current_dir(&self) -> &Path {
+        &self.current_dir
+    }
+
+    /// Returns the file root of this context.
+    pub fn file_root(&self) -> &Path {
+        &self.file_root
+    }
+
     /// Returns a path (absolute or relative), given a filename.
     pub fn resolved_path(&self, filename: &Path) -> PathBuf {
         self.file_root.join(filename)
+    }
+
+    /// Returns the normalized, absolute path for `filename`, resolved against the file root and the
+    /// current directory. The returned path does not need to exist. This is used as a stable key for
+    /// `INCLUDE` cycle detection.
+    pub fn absolute_path(&self, filename: &Path) -> PathBuf {
+        normalize_path(&self.current_dir.join(self.resolved_path(filename)))
     }
 
     /// Checks if a given `filename` access is authorized.

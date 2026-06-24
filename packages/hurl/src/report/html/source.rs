@@ -15,24 +15,42 @@
  * limitations under the License.
  *
  */
-use hurl_core::ast::{HurlFile, SourceInfo};
+use hurl_core::ast::HurlFile;
 
 use crate::report::html::Testcase;
 use crate::report::html::nav::Tab;
-use crate::runner::RunnerError;
+use crate::report::html::testcase::SourceDoc;
 
 impl Testcase {
-    /// Returns the HTML string of the Hurl source file (syntax colored and errors).
-    pub fn get_source_html(&self, hurl_file: &HurlFile, content: &str, secrets: &[&str]) -> String {
-        let nav = self.get_nav_html(content, Tab::Source, secrets);
+    /// Returns the HTML string of a Hurl source `doc` (syntax colored and errors).
+    ///
+    /// `docs` is the list of all source documents of this testcase (used to attribute each error to
+    /// its file), and `top_content` is the top-level file content (used by the shared navigation
+    /// component to list every error).
+    pub(crate) fn get_source_html(
+        &self,
+        hurl_file: &HurlFile,
+        doc: &SourceDoc,
+        docs: &[SourceDoc],
+        top_content: &str,
+        secrets: &[&str],
+    ) -> String {
+        let nav = self.get_nav_html(top_content, Tab::Source, secrets);
         let nav_css = include_str!("resources/nav.css");
         let source_div = hurl_core::format::format_html(hurl_file, false);
-        let lines_div = get_numbered_lines(content, &self.errors);
+        // Only mark the lines of the errors that belong to this document.
+        let error_lines = self
+            .errors
+            .iter()
+            .filter(|(_, _, source)| Testcase::doc_for(source, docs).filename == doc.filename)
+            .map(|(error, _, _)| error.source_info.start.line)
+            .collect::<Vec<_>>();
+        let lines_div = get_numbered_lines(&doc.content, &error_lines);
         let source_css = include_str!("resources/source.css");
         let hurl_css = hurl_core::format::hurl_css();
         format!(
             include_str!("resources/source.html"),
-            filename = self.filename,
+            filename = doc.filename,
             hurl_css = hurl_css,
             lines_div = lines_div,
             nav = nav,
@@ -43,12 +61,9 @@ impl Testcase {
     }
 }
 
-/// Returns a list of lines number in HTML.
-fn get_numbered_lines(content: &str, errors: &[(RunnerError, SourceInfo)]) -> String {
-    let errors = errors
-        .iter()
-        .map(|(error, _)| error.source_info.start.line)
-        .collect::<Vec<_>>();
+/// Returns a list of lines number in HTML, marking `error_lines` as errors.
+fn get_numbered_lines(content: &str, error_lines: &[usize]) -> String {
+    let errors = error_lines;
     let mut lines =
         content
             .lines()
