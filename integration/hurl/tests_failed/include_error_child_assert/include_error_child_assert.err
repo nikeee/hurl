@@ -1,0 +1,10 @@
+error: Assert failure
+  --> tests_failed/include_error_child_assert/child.hurl:4:0
+   |
+   | GET http://localhost:8000/include-error-child-assert/hello
+   | ...
+ 4 | jsonpath "$.greeting" == "goodbye"
+   |   actual:   string <hello>
+   |   expected: string <goodbye>
+   |
+

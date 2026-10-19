@@ -468,7 +468,7 @@ fn variable_definition(reader: &mut Reader) -> ParseResult<VariableDefinition> {
     })
 }
 
-fn variable_name(reader: &mut Reader) -> ParseResult<String> {
+pub(crate) fn variable_name(reader: &mut Reader) -> ParseResult<String> {
     let start = reader.cursor();
     let name = reader.read_while(|c| c.is_alphanumeric() || c == '_' || c == '-');
     if name.is_empty() {
@@ -500,7 +500,7 @@ fn literal_value<T>(reader: &mut Reader, value: T) -> ParseResult<T> {
     }
 }
 
-fn variable_value(reader: &mut Reader) -> ParseResult<VariableValue> {
+pub(crate) fn variable_value(reader: &mut Reader) -> ParseResult<VariableValue> {
     choice(
         &[
             |p1| match null(p1) {

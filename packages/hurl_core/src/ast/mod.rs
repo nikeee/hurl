@@ -17,12 +17,14 @@
  */
 //! Exposes Hurl AST nodes (see [Hurl grammar](https://hurl.dev/docs/grammar.html)).
 pub use self::core::*;
+pub use self::include::*;
 pub use self::json::{JsonListElement, JsonObjectElement, JsonValue};
 pub use self::option::*;
 pub use self::primitive::*;
 pub use self::section::*;
 
 mod core;
+mod include;
 mod json;
 mod option;
 mod primitive;

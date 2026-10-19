@@ -16,8 +16,8 @@
  *
  */
 use hurl_core::ast::{
-    BooleanOption, CountOption, DurationOption, Entry, NaturalOption, Number as AstNumber,
-    OptionKind, Placeholder, Template, VariableDefinition, VariableValue, VerbosityOption,
+    BooleanOption, CountOption, DurationOption, NaturalOption, Number as AstNumber, OptionKind,
+    Placeholder, RequestEntry, Template, VariableDefinition, VariableValue, VerbosityOption,
 };
 use hurl_core::types::{BytesPerSec, Count, DurationUnit};
 
@@ -38,7 +38,7 @@ use super::variable::VariableSet;
 /// and a default `runner_options`.
 /// The [`variables`] can also be updated if `variable` keys are present in the section.
 pub fn get_entry_options(
-    entry: &Entry,
+    entry: &RequestEntry,
     runner_options: &RunnerOptions,
     variables: &mut VariableSet,
     logger: &mut Logger,
@@ -345,7 +345,7 @@ pub fn get_entry_options(
 
 /// Returns the overridden `entry` verbosity, or the default `verbosity` file.
 pub fn get_entry_verbosity(
-    entry: &Entry,
+    entry: &RequestEntry,
     default_verbosity: Option<Verbosity>,
     variables: &VariableSet,
 ) -> Result<Option<Verbosity>, RunnerError> {
@@ -533,7 +533,7 @@ fn eval_duration_option(
 }
 
 /// Evaluates a variable, using a set of `variables`.
-fn eval_variable_value(
+pub(crate) fn eval_variable_value(
     variable_value: &VariableValue,
     variables: &mut VariableSet,
 ) -> Result<Value, RunnerError> {

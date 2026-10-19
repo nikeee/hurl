@@ -17,10 +17,11 @@
  */
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
 
 use crate::html::HtmlEscape;
 use crate::report::ReportError;
-use crate::runner::{EntryResult, HurlResult, RunnerError};
+use crate::runner::{EntryResult, EntrySource, HurlResult, RunnerError};
 use hurl_core::ast::SourceInfo;
 use hurl_core::input::Input;
 use hurl_core::parser;
@@ -34,8 +35,9 @@ pub struct Testcase {
     pub filename: String,
     pub success: bool,
     pub time_in_ms: u128,
-    /// The runtime errors, and the source information of the entry throwing this error.
-    pub errors: Vec<(RunnerError, SourceInfo)>,
+    /// The runtime errors, the source information of the entry throwing this error, and the
+    /// source file of the entry when it comes from an included file.
+    pub errors: Vec<(RunnerError, SourceInfo, Option<Arc<EntrySource>>)>,
     pub timestamp: i64,
 }
 
@@ -46,7 +48,7 @@ impl Testcase {
         let errors = hurl_result
             .errors()
             .into_iter()
-            .map(|(error, entry_src_info)| (error.clone(), entry_src_info))
+            .map(|(error, entry_src_info, source)| (error.clone(), entry_src_info, source.cloned()))
             .collect();
         Testcase {
             id: id.to_string(),
@@ -80,14 +82,14 @@ impl Testcase {
 
         // We create the timeline view.
         let output_file = dir.join(self.timeline_filename());
-        let html = self.get_timeline_html(&hurl_file, content, entries, secrets);
+        let html = self.get_timeline_html(content, entries, secrets);
         fs::write(&output_file, html.as_bytes()).map_err(|e| {
             ReportError::from_io_error(&e, &output_file, "Issue writing HTML report")
         })?;
 
         // Then create the run view.
         let output_file = dir.join(self.run_filename());
-        let html = self.get_run_html(&hurl_file, content, entries, secrets);
+        let html = self.get_run_html(content, entries, secrets);
         fs::write(&output_file, html.as_bytes()).map_err(|e| {
             ReportError::from_io_error(&e, &output_file, "Issue writing HTML report")
         })?;

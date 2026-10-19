@@ -1,0 +1,7 @@
+error: Include cycle
+  --> tests_failed/include_cycle_transitive/middle.hurl:1:9
+   |
+ 1 | INCLUDE ./include_cycle_transitive.hurl
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ file tests_failed/include_cycle_transitive/include_cycle_transitive.hurl is already being run, including it creates a cycle
+   |
+

@@ -20,7 +20,6 @@ use crate::report::html::Testcase;
 use crate::report::html::nav::Tab;
 use crate::report::html::timeline::unit::Pixel;
 use crate::runner::EntryResult;
-use hurl_core::ast::HurlFile;
 use hurl_core::types::Index;
 
 mod calls;
@@ -58,7 +57,6 @@ impl Testcase {
     /// entry in the colored HTML source file.
     pub fn get_timeline_html(
         &self,
-        hurl_file: &HurlFile,
         content: &str,
         entries: &[EntryResult],
         secrets: &[&str],
@@ -68,7 +66,7 @@ impl Testcase {
             .flat_map(|e| &e.calls)
             .collect::<Vec<&Call>>();
 
-        let call_ctxs = self.get_call_contexts(hurl_file, entries);
+        let call_ctxs = self.get_call_contexts(entries);
         let timeline_css = include_str!("../resources/timeline.css");
         let nav = self.get_nav_html(content, Tab::Timeline, secrets);
         let nav_css = include_str!("../resources/nav.css");
@@ -86,14 +84,14 @@ impl Testcase {
     }
 
     /// Constructs a list of call contexts to record source line code, runtime entry and call indices.
-    fn get_call_contexts(&self, hurl_file: &HurlFile, entries: &[EntryResult]) -> Vec<CallContext> {
+    fn get_call_contexts(&self, entries: &[EntryResult]) -> Vec<CallContext> {
         let mut calls_ctx = vec![];
 
         for (entry_index, e) in entries.iter().enumerate() {
             let next_e = entries.get(entry_index + 1);
             let retry = match next_e {
                 None => false, // last entry of the whole run can't be retried
-                Some(next_e) => e.entry_index == next_e.entry_index,
+                Some(next_e) => e.entry_index == next_e.entry_index && e.source == next_e.source,
             };
             let kind = match (e.errors.is_empty(), retry) {
                 (true, _) => CallContextKind::Success,
@@ -101,9 +99,7 @@ impl Testcase {
                 (false, false) => CallContextKind::Failure,
             };
             for (call_entry_index, _) in e.calls.iter().enumerate() {
-                let entry_src_index = e.entry_index.to_zero_based();
-                let entry_src = hurl_file.entries.get(entry_src_index).unwrap();
-                let line = Index::new(entry_src.source_info().start.line);
+                let line = Index::new(e.source_info.start.line);
                 let ctx = CallContext {
                     kind,
                     line,

@@ -40,10 +40,16 @@ impl Testcase {
         let mut failures = vec![];
         let mut errors = vec![];
 
-        for (error, entry_src_info) in hurl_result.errors() {
+        for (error, entry_src_info, source) in hurl_result.errors() {
+            // Errors of an entry coming from an included file are rendered against the
+            // included file content.
+            let (error_filename, error_content) = match source {
+                Some(source) => (source.filename.to_string(), source.content.as_str()),
+                None => (name.clone(), content),
+            };
             let message = error.render(
-                &name,
-                content,
+                &error_filename,
+                error_content,
                 Some(entry_src_info),
                 OutputFormat::Terminal(false),
             );

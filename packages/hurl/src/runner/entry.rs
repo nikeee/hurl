@@ -16,7 +16,7 @@
  *
  */
 use hurl_core::ast::{
-    Assert, Capture, Entry, FilterValue, PredicateFuncValue, Response, SourceInfo,
+    Assert, Capture, FilterValue, PredicateFuncValue, RequestEntry, Response, SourceInfo,
 };
 use hurl_core::types::Index;
 
@@ -41,7 +41,7 @@ use super::variable::VariableSet;
 /// every step of the redirection for the first to the last.
 /// `variables` are used to render values at runtime, and can be updated by captures.
 pub fn run(
-    entry: &Entry,
+    entry: &RequestEntry,
     entry_index: Index,
     http_client: &mut http::Client,
     variables: &mut VariableSet,
@@ -171,6 +171,7 @@ pub fn run(
                 transfer_duration,
                 compressed,
                 curl_cmd,
+                source: None,
             };
         }
     };
@@ -197,6 +198,7 @@ pub fn run(
                         transfer_duration,
                         compressed,
                         curl_cmd,
+                        source: None,
                     };
                 }
             }
@@ -238,6 +240,7 @@ pub fn run(
         transfer_duration,
         compressed,
         curl_cmd,
+        source: None,
     }
 }
 

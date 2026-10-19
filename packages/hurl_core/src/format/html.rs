@@ -17,8 +17,8 @@
  */
 use crate::ast::visit::Visitor;
 use crate::ast::{
-    Comment, Entry, FilterValue, JsonValue, Method, Placeholder, Regex, Request, Response,
-    Template, U64, Whitespace, visit,
+    Comment, Entry, FilterValue, IncludeEntry, JsonValue, Method, Placeholder, Regex, Request,
+    Response, Template, U64, Whitespace, visit,
 };
 use crate::ast::{
     CookiePath, HurlFile, MultilineString, Number, PredicateFuncValue, QueryValue, StatusValue,
@@ -72,6 +72,7 @@ const HURL_DURATION_UNIT: &str = "unit";
 const HURL_ENTRY_CLASS: &str = "entry";
 const HURL_HEX_CLASS: &str = "hex";
 const HURL_FILENAME_CLASS: &str = "filename";
+const HURL_INCLUDE_CLASS: &str = "include";
 const HURL_FILTER_KIND_CLASS: &str = "filter-type";
 const HURL_JSON_CLASS: &str = "json";
 const HURL_LANG_CLASS: &str = "language-hurl";
@@ -266,6 +267,18 @@ impl Visitor for HtmlFormatter {
     fn visit_query_kind(&mut self, kind: &QueryValue) {
         self.span_open(HURL_QUERY_TYPE_CLASS);
         self.push_trusted(kind.identifier());
+        self.span_close();
+    }
+
+    fn visit_include(&mut self, include: &IncludeEntry) {
+        self.span_open(HURL_INCLUDE_CLASS);
+        visit::walk_include(self, include);
+        self.span_close();
+    }
+
+    fn visit_include_keyword(&mut self, keyword: &'static str) {
+        self.span_open(HURL_METHOD_CLASS);
+        self.push_trusted(keyword);
         self.span_close();
     }
 

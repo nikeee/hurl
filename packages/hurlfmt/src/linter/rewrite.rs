@@ -18,11 +18,12 @@
 use hurl_core::ast::{
     Assert, Base64, Body, BooleanOption, Bytes, Capture, CertificateAttributeName, Comment, Cookie,
     CookiePath, CountOption, Duration, DurationOption, Entry, EntryOption, File, FilenameParam,
-    FilenameValue, FilterValue, Hex, HurlFile, I64, IntegerValue, JsonValue, KeyValue,
-    LineTerminator, Method, MultilineString, MultipartParam, NaturalOption, Number, OptionKind,
-    Placeholder, Predicate, PredicateFuncValue, PredicateValue, Query, QueryValue, Regex,
-    RegexValue, Request, Response, Section, SectionValue, StatusValue, Template, U64,
-    VariableDefinition, VariableValue, VerbosityOption, VersionValue,
+    FilenameValue, FilterValue, Hex, HurlFile, I64, IncludeCapture, IncludeEntry, IncludeSection,
+    IncludeSectionValue, IncludeVariable, IntegerValue, JsonValue, KeyValue, LineTerminator,
+    Method, MultilineString, MultipartParam, NaturalOption, Number, OptionKind, Placeholder,
+    Predicate, PredicateFuncValue, PredicateValue, Query, QueryValue, Regex, RegexValue, Request,
+    Response, Section, SectionValue, StatusValue, Template, U64, VariableDefinition, VariableValue,
+    VerbosityOption, VersionValue,
 };
 use hurl_core::types::{Count, DurationUnit, ToSource};
 
@@ -184,11 +185,90 @@ impl Lint for CountOption {
 
 impl Lint for Entry {
     fn lint(&self) -> String {
-        let mut s = String::new();
-        s.push_str(&self.request.lint());
-        if let Some(response) = &self.response {
-            s.push_str(&response.lint());
+        match self {
+            Entry::Request(entry) => {
+                let mut s = String::new();
+                s.push_str(&entry.request.lint());
+                if let Some(response) = &entry.response {
+                    s.push_str(&response.lint());
+                }
+                s
+            }
+            Entry::Include(include) => include.lint(),
         }
+    }
+}
+
+impl Lint for IncludeEntry {
+    fn lint(&self) -> String {
+        let mut s = String::new();
+        self.line_terminators
+            .iter()
+            .for_each(|lt| s.push_str(&lint_lt(lt, false)));
+        s.push_str("INCLUDE");
+        s.push(' ');
+        s.push_str(&self.path.lint());
+        s.push_str(&lint_lt(&self.line_terminator0, true));
+
+        // We rewrite our file and reorder the various sections.
+        if let Some(section) = get_include_variables_section(self) {
+            s.push_str(&section.lint());
+        }
+        if let Some(section) = get_include_captures_section(self) {
+            s.push_str(&section.lint());
+        }
+        s
+    }
+}
+
+impl Lint for IncludeSection {
+    fn lint(&self) -> String {
+        let mut s = String::new();
+        self.line_terminators
+            .iter()
+            .for_each(|lt| s.push_str(&lint_lt(lt, false)));
+        s.push('[');
+        s.push_str(self.identifier());
+        s.push(']');
+        s.push_str(&lint_lt(&self.line_terminator0, true));
+        match &self.value {
+            IncludeSectionValue::Variables(variables) => {
+                variables.iter().for_each(|v| s.push_str(&v.lint()));
+            }
+            IncludeSectionValue::Captures(captures) => {
+                captures.iter().for_each(|c| s.push_str(&c.lint()));
+            }
+        }
+        s
+    }
+}
+
+impl Lint for IncludeVariable {
+    fn lint(&self) -> String {
+        let mut s = String::new();
+        self.line_terminators
+            .iter()
+            .for_each(|lt| s.push_str(&lint_lt(lt, false)));
+        s.push_str(&self.name);
+        s.push(':');
+        s.push(' ');
+        s.push_str(&self.value.lint());
+        s.push_str(&lint_lt(&self.line_terminator0, true));
+        s
+    }
+}
+
+impl Lint for IncludeCapture {
+    fn lint(&self) -> String {
+        let mut s = String::new();
+        self.line_terminators
+            .iter()
+            .for_each(|lt| s.push_str(&lint_lt(lt, false)));
+        s.push_str(&self.name);
+        s.push(':');
+        s.push(' ');
+        s.push_str(&self.alias);
+        s.push_str(&lint_lt(&self.line_terminator0, true));
         s
     }
 }
@@ -856,6 +936,24 @@ fn get_asserts_section(response: &Response) -> Option<&Section> {
 fn get_captures_section(response: &Response) -> Option<&Section> {
     for s in &response.sections {
         if let SectionValue::Captures(_) = s.value {
+            return Some(s);
+        }
+    }
+    None
+}
+
+fn get_include_variables_section(include: &IncludeEntry) -> Option<&IncludeSection> {
+    for s in &include.sections {
+        if let IncludeSectionValue::Variables(_) = s.value {
+            return Some(s);
+        }
+    }
+    None
+}
+
+fn get_include_captures_section(include: &IncludeEntry) -> Option<&IncludeSection> {
+    for s in &include.sections {
+        if let IncludeSectionValue::Captures(_) = s.value {
             return Some(s);
         }
     }

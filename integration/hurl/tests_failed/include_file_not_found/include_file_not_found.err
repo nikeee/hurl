@@ -1,0 +1,7 @@
+error: File read access
+  --> tests_failed/include_file_not_found/include_file_not_found.hurl:1:9
+   |
+ 1 | INCLUDE ./does_not_exist.hurl
+   |         ^^^^^^^^^^^^^^^^^^^^^ file tests_failed/include_file_not_found/does_not_exist.hurl can not be read
+   |
+

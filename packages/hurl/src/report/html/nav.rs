@@ -61,13 +61,20 @@ impl Testcase {
     fn get_errors_html(&self, content: &str, secrets: &[&str]) -> String {
         self.errors
             .iter()
-            .map(|(error, entry_src_info)| {
+            .map(|(error, entry_src_info, source)| {
+                // Errors of an entry coming from an included file are rendered against the
+                // included file content. As the source view only displays the run file, errors
+                // from included files are not linked to it.
+                let (filename, content, source_filename) = match source {
+                    Some(source) => (source.filename.to_string(), source.content.as_str(), None),
+                    None => (self.filename.clone(), content, Some(self.source_filename())),
+                };
                 let error = error_to_html(
                     error,
                     *entry_src_info,
                     content,
-                    &self.filename,
-                    &self.source_filename(),
+                    &filename,
+                    source_filename.as_deref(),
                     secrets,
                 );
                 format!("<div class=\"error\"><div class=\"error-desc\">{error}</div></div>")
@@ -89,7 +96,7 @@ fn error_to_html(
     entry_src_info: SourceInfo,
     content: &str,
     filename: &str,
-    source_filename: &str,
+    source_filename: Option<&str>,
     secrets: &[&str],
 ) -> String {
     let line = error.source_info.start.line;
@@ -102,11 +109,14 @@ fn error_to_html(
     );
     let message = message.redact(secrets).html_escape();
     // We override the first part of the error string to add an anchor to the error context.
-    let filename = filename.html_escape();
-    let old = format!("{filename}:{line}:{column}");
-    let href = source_filename;
-    let new = format!("<a href=\"{href}#l{line}\">{filename}:{line}:{column}</a>");
-    let message = message.replace(&old, &new);
+    let message = if let Some(href) = source_filename {
+        let filename = filename.html_escape();
+        let old = format!("{filename}:{line}:{column}");
+        let new = format!("<a href=\"{href}#l{line}\">{filename}:{line}:{column}</a>");
+        message.replace(&old, &new)
+    } else {
+        message
+    };
     format!("<pre><code>{message}</code></pre>")
 }
 
@@ -142,7 +152,7 @@ mod tests {
             entry_src_info,
             content,
             filename,
-            source_filename,
+            Some(source_filename),
             &[],
         );
         assert_eq!(

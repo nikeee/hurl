@@ -103,7 +103,7 @@ fn response_section(reader: &mut Reader) -> ParseResult<Section> {
     })
 }
 
-fn section_name(reader: &mut Reader) -> ParseResult<String> {
+pub(crate) fn section_name(reader: &mut Reader) -> ParseResult<String> {
     let pos = reader.cursor().pos;
     try_literal("[", reader)?;
     let name = reader.read_while(|c| c.is_alphanumeric());

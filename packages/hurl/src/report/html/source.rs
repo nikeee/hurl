@@ -15,11 +15,13 @@
  * limitations under the License.
  *
  */
+use std::sync::Arc;
+
 use hurl_core::ast::{HurlFile, SourceInfo};
 
 use crate::report::html::Testcase;
 use crate::report::html::nav::Tab;
-use crate::runner::RunnerError;
+use crate::runner::{EntrySource, RunnerError};
 
 impl Testcase {
     /// Returns the HTML string of the Hurl source file (syntax colored and errors).
@@ -44,10 +46,16 @@ impl Testcase {
 }
 
 /// Returns a list of lines number in HTML.
-fn get_numbered_lines(content: &str, errors: &[(RunnerError, SourceInfo)]) -> String {
+fn get_numbered_lines(
+    content: &str,
+    errors: &[(RunnerError, SourceInfo, Option<Arc<EntrySource>>)],
+) -> String {
+    // Only errors from the run file are marked in the source view: errors from included files
+    // have line numbers relative to the included file.
     let errors = errors
         .iter()
-        .map(|(error, _)| error.source_info.start.line)
+        .filter(|(_, _, source)| source.is_none())
+        .map(|(error, _, _)| error.source_info.start.line)
         .collect::<Vec<_>>();
     let mut lines =
         content

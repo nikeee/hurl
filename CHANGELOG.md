@@ -17,6 +17,7 @@ Thanks to
 
 Enhancements:
 
+* Add INCLUDE statement to run a Hurl file from another Hurl file, with explicit variables/captures passing, an isolated variable environment and cookie jar per include, and include cycle detection. Errors and reports of included entries reference the included file. As a consequence, INCLUDE becomes a reserved keyword and can't be used as a custom HTTP method anymore; hurlfmt JSON export and --json run export gain include-related fields [#115](https://github.com/Orange-OpenSource/hurl/issues/115)
 * Add --no-header option to remove specific HTTP header [#4884](https://github.com/Orange-OpenSource/hurl/issues/4884)
 * Add --fail-with-body option to output response body when there are errors [#4776](https://github.com/Orange-OpenSource/hurl/issues/4776)
 * Add no jsonpath coercion option [#5077](https://github.com/Orange-OpenSource/hurl/issues/5077)

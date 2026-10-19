@@ -59,9 +59,22 @@ impl ContextDir {
     /// response can be outputted to a given file when using `output` option in \[Options\] sections.
     pub fn is_access_allowed(&self, filename: &Path) -> bool {
         let file = self.resolved_path(filename);
-        let absolute_file = self.current_dir.join(file);
+        self.is_access_allowed_resolved(&file)
+    }
+
+    /// Checks if access to an already resolved `path` (absolute, or relative to the current
+    /// working directory) is authorized. Contrary to [`ContextDir::is_access_allowed`], the path
+    /// is not resolved against the file root; this is used for paths that are relative to
+    /// something else, like includes that are relative to the file including them.
+    pub fn is_access_allowed_resolved(&self, path: &Path) -> bool {
+        let absolute_file = self.current_dir.join(path);
         let absolute_file_root = self.current_dir.join(&self.file_root);
         is_descendant(absolute_file.as_path(), absolute_file_root.as_path())
+    }
+
+    /// Returns the current working directory of this context.
+    pub fn current_dir(&self) -> &Path {
+        &self.current_dir
     }
 }
 

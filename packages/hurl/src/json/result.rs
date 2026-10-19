@@ -75,6 +75,10 @@ struct HurlResultJson {
 #[derive(Deserialize, Serialize)]
 struct EntryResultJson {
     index: usize,
+    /// Source file of this entry, only set when the entry comes from an included file.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    filename: Option<String>,
     line: usize,
     calls: Vec<CallJson>,
     captures: Vec<CaptureJson>,
@@ -241,6 +245,12 @@ impl EntryResultJson {
         response_dir: Option<&Path>,
         secrets: &[&str],
     ) -> Result<Self, io::Error> {
+        // Asserts of an entry coming from an included file are rendered against the included
+        // file content.
+        let (content, filename) = match &entry.source {
+            Some(source) => (source.content.as_str(), &source.filename),
+            None => (content, filename),
+        };
         let calls = entry
             .calls
             .iter()
@@ -258,6 +268,7 @@ impl EntryResultJson {
             .collect::<Vec<_>>();
         Ok(EntryResultJson {
             index: entry.entry_index.get(),
+            filename: entry.source.as_ref().map(|s| s.filename.to_string()),
             line: entry.source_info.start.line,
             calls,
             captures,

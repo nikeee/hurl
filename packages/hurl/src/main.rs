@@ -283,7 +283,7 @@ fn exit_code(runs: &[HurlRun]) -> u8 {
     for run in runs.iter() {
         let errors = run.hurl_result.errors();
         if errors.is_empty() {
-        } else if errors.iter().filter(|(error, _)| !error.assert).count() == 0 {
+        } else if errors.iter().filter(|(error, _, _)| !error.assert).count() == 0 {
             count_errors_assert += 1;
         } else {
             count_errors_runner += 1;

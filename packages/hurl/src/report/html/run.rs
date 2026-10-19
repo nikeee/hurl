@@ -15,8 +15,6 @@
  * limitations under the License.
  *
  */
-use hurl_core::ast::HurlFile;
-
 use crate::html::HtmlEscape;
 use crate::http::Call;
 use crate::report::html::Testcase;
@@ -26,22 +24,14 @@ use crate::util::redacted::Redact;
 
 impl Testcase {
     /// Creates an HTML view of a run (HTTP status code, response header etc...)
-    pub fn get_run_html(
-        &self,
-        hurl_file: &HurlFile,
-        content: &str,
-        entries: &[EntryResult],
-        secrets: &[&str],
-    ) -> String {
+    pub fn get_run_html(&self, content: &str, entries: &[EntryResult], secrets: &[&str]) -> String {
         let nav = self.get_nav_html(content, Tab::Run, secrets);
         let nav_css = include_str!("resources/nav.css");
         let run_css = include_str!("resources/run.css");
 
         let mut run = String::new();
         for (entry_index, e) in entries.iter().enumerate() {
-            let entry_src_index = e.entry_index.to_zero_based();
-            let entry_src = hurl_file.entries.get(entry_src_index).unwrap();
-            let line = entry_src.source_info().start.line;
+            let line = e.source_info.start.line;
             let source = self.source_filename();
 
             run.push_str("<details open>");

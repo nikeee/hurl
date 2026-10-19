@@ -17,9 +17,11 @@
  */
 use std::cmp::min;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 
 use hurl_core::ast::SourceInfo;
+use hurl_core::input::Input;
 use hurl_core::reader::Pos;
 use hurl_core::types::Index;
 
@@ -53,23 +55,29 @@ pub struct HurlResult {
 
 impl HurlResult {
     /// Returns all the effective errors of this `HurlResult`, with the source information
-    /// of the entry where the error happens.
+    /// of the entry where the error happens and the source file of the entry (`None` if the
+    /// entry comes from the run file, and not from an included file).
     ///
     /// The errors are only the "effective" ones: those that are due to retry are
     /// ignored.
-    pub fn errors(&self) -> Vec<(&RunnerError, SourceInfo)> {
+    pub fn errors(&self) -> Vec<(&RunnerError, SourceInfo, Option<&Arc<EntrySource>>)> {
         let mut errors = vec![];
         let mut next_entries = self.entries.iter().skip(1);
         for entry in self.entries.iter() {
             match next_entries.next() {
                 None => {
-                    let new_errors = entry.errors.iter().map(|error| (error, entry.source_info));
+                    let new_errors = entry
+                        .errors
+                        .iter()
+                        .map(|error| (error, entry.source_info, entry.source.as_ref()));
                     errors.extend(new_errors);
                 }
                 Some(next) => {
-                    if next.entry_index != entry.entry_index {
-                        let new_errors =
-                            entry.errors.iter().map(|error| (error, entry.source_info));
+                    if next.entry_index != entry.entry_index || next.source != entry.source {
+                        let new_errors = entry
+                            .errors
+                            .iter()
+                            .map(|error| (error, entry.source_info, entry.source.as_ref()));
                         errors.extend(new_errors);
                     }
                 }
@@ -77,6 +85,16 @@ impl HurlResult {
         }
         errors
     }
+}
+
+/// Represents the source file of an entry, when the entry does not come from the main file
+/// of the run but from an included file.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EntrySource {
+    /// The included file.
+    pub filename: Input,
+    /// The content of the included file.
+    pub content: String,
 }
 
 /// Represents the execution result of an entry.
@@ -104,6 +122,26 @@ pub struct EntryResult {
     pub compressed: bool,
     /// The debug curl command line from this entry result.
     pub curl_cmd: CurlCmd,
+    /// The source file of this entry, when the entry comes from an included file (`None` if
+    /// the entry comes from the file of the run). Used to report errors against the included
+    /// file content.
+    pub source: Option<Arc<EntrySource>>,
+}
+
+impl EntryResult {
+    /// Returns the source content and filename against which errors of this entry should be
+    /// rendered: the entry's own source file if it comes from an included file, or the given
+    /// default content and filename (the file of the run) otherwise.
+    pub fn source_content<'a>(
+        &'a self,
+        default_content: &'a str,
+        default_filename: Option<&'a Input>,
+    ) -> (&'a str, Option<&'a Input>) {
+        match &self.source {
+            Some(source) => (&source.content, Some(&source.filename)),
+            None => (default_content, default_filename),
+        }
+    }
 }
 
 impl Default for EntryResult {
@@ -118,6 +156,7 @@ impl Default for EntryResult {
             transfer_duration: Duration::from_millis(0),
             compressed: false,
             curl_cmd: CurlCmd::default(),
+            source: None,
         }
     }
 }
@@ -286,4 +325,84 @@ impl EntryResult {
 fn is_binary(bytes: &[u8]) -> bool {
     let len = min(2000, bytes.len());
     bytes[..len].contains(&0)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use hurl_core::ast::SourceInfo;
+    use hurl_core::input::Input;
+    use hurl_core::reader::Pos;
+    use hurl_core::types::Index;
+
+    use super::{EntryResult, EntrySource, HurlResult};
+    use crate::runner::error::{RunnerError, RunnerErrorKind};
+
+    fn error_at(line: usize) -> RunnerError {
+        RunnerError::new(
+            SourceInfo::new(Pos::new(line, 1), Pos::new(line, 1)),
+            RunnerErrorKind::NoQueryResult,
+            true,
+        )
+    }
+
+    fn entry(
+        index: usize,
+        source: Option<Arc<EntrySource>>,
+        errors: Vec<RunnerError>,
+    ) -> EntryResult {
+        EntryResult {
+            entry_index: Index::new(index),
+            source,
+            errors,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn errors_dedup_retries_by_index_and_source() {
+        let included = Arc::new(EntrySource {
+            filename: Input::new("child.hurl"),
+            content: "GET http://foo".to_string(),
+        });
+
+        // Entry 1 is retried (same index, same source): only the last error is effective.
+        // The included entry has the same index as the parent entry, but a different source:
+        // its error must not be considered as a retry of the parent entry.
+        let entries = vec![
+            entry(1, None, vec![error_at(1)]),
+            entry(1, None, vec![error_at(1)]),
+            entry(1, Some(included.clone()), vec![error_at(2)]),
+            entry(2, None, vec![]),
+        ];
+        let result = HurlResult {
+            entries,
+            ..Default::default()
+        };
+        let errors = result.errors();
+        assert_eq!(errors.len(), 2);
+        assert!(errors[0].2.is_none());
+        assert_eq!(errors[1].2, Some(&included));
+    }
+
+    #[test]
+    fn source_content_selects_included_file() {
+        let included = Arc::new(EntrySource {
+            filename: Input::new("child.hurl"),
+            content: "child content".to_string(),
+        });
+        let filename = Input::new("parent.hurl");
+
+        let e = entry(1, None, vec![]);
+        assert_eq!(
+            e.source_content("parent content", Some(&filename)),
+            ("parent content", Some(&filename))
+        );
+
+        let e = entry(1, Some(included.clone()), vec![]);
+        let (content, input) = e.source_content("parent content", Some(&filename));
+        assert_eq!(content, "child content");
+        assert_eq!(input.unwrap().to_string(), "child.hurl");
+    }
 }

@@ -20,10 +20,10 @@ use base64::engine::general_purpose;
 use hurl_core::ast::{
     Assert, Base64, Body, BooleanOption, Bytes, Capture, CertificateAttributeName, Comment, Cookie,
     CountOption, Duration, DurationOption, Entry, EntryOption, File, FilenameParam, Filter,
-    FilterValue, Hex, HurlFile, JsonListElement, JsonValue, KeyValue, MultilineString,
-    MultilineStringKind, MultipartParam, NaturalOption, OptionKind, Placeholder, Predicate,
-    PredicateFuncValue, PredicateValue, Query, QueryValue, Regex, RegexValue, Request, Response,
-    StatusValue, VersionValue,
+    FilterValue, Hex, HurlFile, IncludeCapture, IncludeEntry, IncludeVariable, JsonListElement,
+    JsonValue, KeyValue, MultilineString, MultilineStringKind, MultipartParam, NaturalOption,
+    OptionKind, Placeholder, Predicate, PredicateFuncValue, PredicateValue, Query, QueryValue,
+    Regex, RegexValue, Request, Response, StatusValue, VersionValue,
 };
 use hurl_core::types::{Count, ToSource};
 
@@ -48,11 +48,54 @@ impl ToJson for HurlFile {
 
 impl ToJson for Entry {
     fn to_json(&self) -> JValue {
-        let mut attributes = vec![("request".to_string(), self.request.to_json())];
-        if let Some(response) = &self.response {
-            attributes.push(("response".to_string(), response.to_json()));
+        match self {
+            Entry::Request(entry) => {
+                let mut attributes = vec![("request".to_string(), entry.request.to_json())];
+                if let Some(response) = &entry.response {
+                    attributes.push(("response".to_string(), response.to_json()));
+                }
+                JValue::Object(attributes)
+            }
+            Entry::Include(include) => {
+                JValue::Object(vec![("include".to_string(), include.to_json())])
+            }
+        }
+    }
+}
+
+impl ToJson for IncludeEntry {
+    fn to_json(&self) -> JValue {
+        let mut attributes = vec![("path".to_string(), JValue::String(self.path.to_string()))];
+        if !self.variables().is_empty() {
+            let variables = self.variables().iter().map(|v| v.to_json()).collect();
+            attributes.push(("variables".to_string(), JValue::List(variables)));
+        }
+        if !self.captures().is_empty() {
+            let captures = self.captures().iter().map(|c| c.to_json()).collect();
+            attributes.push(("captures".to_string(), JValue::List(captures)));
         }
         JValue::Object(attributes)
+    }
+}
+
+impl ToJson for IncludeVariable {
+    fn to_json(&self) -> JValue {
+        JValue::Object(vec![
+            ("name".to_string(), JValue::String(self.name.clone())),
+            (
+                "value".to_string(),
+                JValue::String(self.value.to_source().to_string()),
+            ),
+        ])
+    }
+}
+
+impl ToJson for IncludeCapture {
+    fn to_json(&self) -> JValue {
+        JValue::Object(vec![
+            ("name".to_string(), JValue::String(self.name.clone())),
+            ("alias".to_string(), JValue::String(self.alias.clone())),
+        ])
     }
 }
 

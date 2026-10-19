@@ -105,6 +105,10 @@ impl Visitor for TextFormatter {
         self.buffer.push(lit);
     }
 
+    fn visit_include_keyword(&mut self, keyword: &'static str) {
+        self.buffer.push_with(keyword, Style::new().yellow());
+    }
+
     fn visit_method(&mut self, method: &Method) {
         let value = method.to_source();
         self.buffer.push_with(value.as_str(), Style::new().yellow());

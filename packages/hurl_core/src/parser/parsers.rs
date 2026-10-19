@@ -17,8 +17,8 @@
  */
 use crate::ast::VersionValue::VersionAny;
 use crate::ast::{
-    Body, Entry, HurlFile, Method, Request, Response, Section, SourceInfo, Status, StatusValue,
-    Version, VersionValue,
+    Body, Entry, HurlFile, Method, Request, RequestEntry, Response, Section, SourceInfo, Status,
+    StatusValue, Version, VersionValue,
 };
 use crate::combinator::{optional, zero_or_more};
 use crate::parser::bytes::bytes;
@@ -28,7 +28,7 @@ use crate::parser::primitives::{
 };
 use crate::parser::sections::{request_sections, response_sections};
 use crate::parser::string::unquoted_template;
-use crate::parser::{ParseError, ParseErrorKind, ParseResult};
+use crate::parser::{ParseError, ParseErrorKind, ParseResult, include};
 use crate::reader::Reader;
 
 pub fn hurl_file(reader: &mut Reader) -> ParseResult<HurlFile> {
@@ -42,12 +42,22 @@ pub fn hurl_file(reader: &mut Reader) -> ParseResult<HurlFile> {
 }
 
 fn entry(reader: &mut Reader) -> ParseResult<Entry> {
+    let start = reader.cursor();
+    match include::include_entry(reader) {
+        Ok(include) => return Ok(Entry::Include(include)),
+        Err(error) => {
+            if !error.recoverable {
+                return Err(error);
+            }
+            reader.seek(start);
+        }
+    }
     let req = request(reader)?;
     let resp = optional(response, reader)?;
-    Ok(Entry {
+    Ok(Entry::Request(RequestEntry {
         request: req,
         response: resp,
-    })
+    }))
 }
 
 fn request(reader: &mut Reader) -> ParseResult<Request> {
@@ -237,7 +247,7 @@ mod tests {
     fn test_entry() {
         let mut reader = Reader::new("GET http://google.fr");
         let e = entry(&mut reader).unwrap();
-        assert_eq!(e.request.method, Method::new("GET"));
+        assert_eq!(e.as_request().unwrap().request.method, Method::new("GET"));
         assert_eq!(reader.cursor().index, CharPos(20));
     }
 
@@ -246,12 +256,12 @@ mod tests {
         let mut reader = Reader::new("GET http://google.fr\nGET http://google.fr");
 
         let e = entry(&mut reader).unwrap();
-        assert_eq!(e.request.method, Method::new("GET"));
+        assert_eq!(e.as_request().unwrap().request.method, Method::new("GET"));
         assert_eq!(reader.cursor().index, CharPos(21));
         assert_eq!(reader.cursor().pos.line, 2);
 
         let e = entry(&mut reader).unwrap();
-        assert_eq!(e.request.method, Method::new("GET"));
+        assert_eq!(e.as_request().unwrap().request.method, Method::new("GET"));
         assert_eq!(reader.cursor().index, CharPos(41));
         assert_eq!(reader.cursor().pos.line, 2);
 
@@ -259,12 +269,12 @@ mod tests {
             Reader::new("GET http://google.fr # comment1\nGET http://google.fr # comment2");
 
         let e = entry(&mut reader).unwrap();
-        assert_eq!(e.request.method, Method::new("GET"));
+        assert_eq!(e.as_request().unwrap().request.method, Method::new("GET"));
         assert_eq!(reader.cursor().index, CharPos(32));
         assert_eq!(reader.cursor().pos.line, 2);
 
         let e = entry(&mut reader).unwrap();
-        assert_eq!(e.request.method, Method::new("GET"));
+        assert_eq!(e.as_request().unwrap().request.method, Method::new("GET"));
         assert_eq!(reader.cursor().index, CharPos(63));
         assert_eq!(reader.cursor().pos.line, 2);
     }
@@ -273,8 +283,12 @@ mod tests {
     fn test_entry_with_response() {
         let mut reader = Reader::new("GET http://google.fr\nHTTP/1.1 200");
         let e = entry(&mut reader).unwrap();
+        let e = e.as_request().unwrap();
         assert_eq!(e.request.method, Method::new("GET"));
-        assert_eq!(e.response.unwrap().status.value, StatusValue::Specific(200));
+        assert_eq!(
+            e.response.as_ref().unwrap().status.value,
+            StatusValue::Specific(200)
+        );
     }
 
     #[test]

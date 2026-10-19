@@ -19,6 +19,7 @@ use std::fmt;
 
 use crate::types::{SourceString, ToSource};
 
+use super::include::IncludeEntry;
 use super::option::EntryOption;
 use super::primitive::{
     Bytes, I64, KeyValue, LineTerminator, Placeholder, SourceInfo, Template, Whitespace,
@@ -32,15 +33,50 @@ pub struct HurlFile {
     pub line_terminators: Vec<LineTerminator>,
 }
 
-/// Represents an entry; a request AST specification to be run and an optional response AST
-/// specification to be checked.
+/// Represents an entry; either a request to be run (with an optional response specification
+/// to be checked), or an include of another Hurl file.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Entry {
+#[allow(clippy::large_enum_variant)]
+pub enum Entry {
+    Request(RequestEntry),
+    Include(IncludeEntry),
+}
+
+impl Entry {
+    /// Returns the source information for this entry.
+    pub fn source_info(&self) -> SourceInfo {
+        match self {
+            Entry::Request(entry) => entry.source_info(),
+            Entry::Include(entry) => entry.source_info,
+        }
+    }
+
+    /// Returns the request entry if this entry is a request, `None` otherwise.
+    pub fn as_request(&self) -> Option<&RequestEntry> {
+        match self {
+            Entry::Request(entry) => Some(entry),
+            Entry::Include(_) => None,
+        }
+    }
+
+    /// Returns the include entry if this entry is an include, `None` otherwise.
+    pub fn as_include(&self) -> Option<&IncludeEntry> {
+        match self {
+            Entry::Request(_) => None,
+            Entry::Include(include) => Some(include),
+        }
+    }
+}
+
+/// Represents a request entry; a request AST specification to be run and an optional response
+/// AST specification to be checked.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RequestEntry {
     pub request: Request,
     pub response: Option<Response>,
 }
 
-impl Entry {
+impl RequestEntry {
     /// Returns the source information for this entry.
     pub fn source_info(&self) -> SourceInfo {
         self.request.space0.source_info

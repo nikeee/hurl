@@ -1,0 +1,7 @@
+error: Parsing include section name
+  --> tests_error_parser/include_bad_section.hurl:2:2
+   |
+ 2 | [Asserts]
+   |  ^ the section is not valid. Valid values are Variables, Captures
+   |
+

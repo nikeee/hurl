@@ -23,11 +23,12 @@
 use crate::ast::{
     Assert, Base64, Body, BooleanOption, Bytes, Capture, Comment, Cookie, CookiePath, CountOption,
     Duration, DurationOption, Entry, EntryOption, File, FilenameParam, FilenameValue, Filter,
-    FilterValue, Hex, HurlFile, IntegerValue, JsonValue, KeyValue, LineTerminator, Method,
-    MultilineString, MultipartParam, NaturalOption, Number, OptionKind, Placeholder, Predicate,
-    PredicateFuncValue, PredicateValue, Query, QueryValue, Regex, RegexValue, Request, Response,
-    Section, SectionValue, StatusValue, Template, U64, VariableDefinition, VariableValue,
-    VerbosityOption, VersionValue, Whitespace,
+    FilterValue, Hex, HurlFile, IncludeCapture, IncludeEntry, IncludeSection, IncludeSectionValue,
+    IncludeVariable, IntegerValue, JsonValue, KeyValue, LineTerminator, Method, MultilineString,
+    MultipartParam, NaturalOption, Number, OptionKind, Placeholder, Predicate, PredicateFuncValue,
+    PredicateValue, Query, QueryValue, Regex, RegexValue, Request, Response, Section, SectionValue,
+    StatusValue, Template, U64, VariableDefinition, VariableValue, VerbosityOption, VersionValue,
+    Whitespace,
 };
 use crate::types::{Count, DurationUnit, SourceString, ToSource};
 
@@ -126,6 +127,24 @@ pub trait Visitor: Sized {
 
     fn visit_hurl_file(&mut self, file: &HurlFile) {
         walk_hurl_file(self, file);
+    }
+
+    fn visit_include(&mut self, include: &IncludeEntry) {
+        walk_include(self, include);
+    }
+
+    fn visit_include_capture(&mut self, capture: &IncludeCapture) {
+        walk_include_capture(self, capture);
+    }
+
+    fn visit_include_keyword(&mut self, keyword: &'static str) {}
+
+    fn visit_include_section(&mut self, section: &IncludeSection) {
+        walk_include_section(self, section);
+    }
+
+    fn visit_include_variable(&mut self, variable: &IncludeVariable) {
+        walk_include_variable(self, variable);
     }
 
     fn visit_integer_value(&mut self, n: &IntegerValue) {
@@ -344,10 +363,74 @@ pub fn walk_duration_option<V: Visitor>(visitor: &mut V, option: &DurationOption
 }
 
 pub fn walk_entry<V: Visitor>(visitor: &mut V, entry: &Entry) {
-    visitor.visit_request(&entry.request);
-    if let Some(ref response) = entry.response {
-        visitor.visit_response(response);
+    match entry {
+        Entry::Request(entry) => {
+            visitor.visit_request(&entry.request);
+            if let Some(ref response) = entry.response {
+                visitor.visit_response(response);
+            }
+        }
+        Entry::Include(include) => visitor.visit_include(include),
     }
+}
+
+pub fn walk_include<V: Visitor>(visitor: &mut V, include: &IncludeEntry) {
+    include.line_terminators.iter().for_each(|lt| {
+        visitor.visit_lt(lt);
+    });
+    visitor.visit_whitespace(&include.space0);
+    visitor.visit_include_keyword("INCLUDE");
+    visitor.visit_whitespace(&include.space1);
+    visitor.visit_filename(&include.path);
+    visitor.visit_lt(&include.line_terminator0);
+    include
+        .sections
+        .iter()
+        .for_each(|s| visitor.visit_include_section(s));
+}
+
+pub fn walk_include_section<V: Visitor>(visitor: &mut V, section: &IncludeSection) {
+    section.line_terminators.iter().for_each(|lt| {
+        visitor.visit_lt(lt);
+    });
+    visitor.visit_whitespace(&section.space0);
+    let name = format!("[{}]", section.identifier());
+    visitor.visit_section_header(&name);
+    visitor.visit_lt(&section.line_terminator0);
+    match &section.value {
+        IncludeSectionValue::Variables(variables) => variables
+            .iter()
+            .for_each(|v| visitor.visit_include_variable(v)),
+        IncludeSectionValue::Captures(captures) => captures
+            .iter()
+            .for_each(|c| visitor.visit_include_capture(c)),
+    }
+}
+
+pub fn walk_include_variable<V: Visitor>(visitor: &mut V, variable: &IncludeVariable) {
+    variable.line_terminators.iter().for_each(|lt| {
+        visitor.visit_lt(lt);
+    });
+    visitor.visit_whitespace(&variable.space0);
+    visitor.visit_variable_name(&variable.name);
+    visitor.visit_whitespace(&variable.space1);
+    visitor.visit_literal(":");
+    visitor.visit_whitespace(&variable.space2);
+    visitor.visit_variable_value(&variable.value);
+    visitor.visit_lt(&variable.line_terminator0);
+}
+
+pub fn walk_include_capture<V: Visitor>(visitor: &mut V, capture: &IncludeCapture) {
+    capture.line_terminators.iter().for_each(|lt| {
+        visitor.visit_lt(lt);
+    });
+    visitor.visit_whitespace(&capture.space0);
+    visitor.visit_variable_name(&capture.name);
+    visitor.visit_whitespace(&capture.space1);
+    visitor.visit_literal(":");
+    visitor.visit_whitespace(&capture.space2);
+    visitor.visit_variable_name(&capture.alias);
+    visitor.visit_lt(&capture.line_terminator0);
 }
 
 pub fn walk_entry_option<V: Visitor>(visitor: &mut V, option: &EntryOption) {

@@ -1,0 +1,15 @@
+<pre><code class="language-hurl"><span class="entry"><span class="request"><span class="method">GET</span> <span class="url">http://localhost:8000/login</span>
+</span><span class="response"><span class="version">HTTP</span> <span class="number">200</span>
+<span class="section-header">[Captures]</span>
+<span class="string">admin_cookie</span>: <span class="query-type">cookie</span> <span class="string">"session"</span>
+</span></span><span class="entry"><span class="include">
+<span class="method">INCLUDE</span> <span class="filename">./post-comment.hurl</span>
+<span class="section-header">[Variables]</span>
+cookie: <span class="string">{{admin_cookie}}</span>
+contents: <span class="string">also hi</span>
+count: <span class="number">3</span>
+flag: <span class="boolean">true</span>
+nothing: <span class="null">null</span>
+<span class="section-header">[Captures]</span>
+post_id: admin_comment_id
+</span></span></code></pre>

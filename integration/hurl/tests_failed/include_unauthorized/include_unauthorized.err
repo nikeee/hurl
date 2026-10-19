@@ -1,0 +1,7 @@
+error: Unauthorized file access
+  --> tests_failed/include_unauthorized/include_unauthorized.hurl:1:9
+   |
+ 1 | INCLUDE ../outside.hurl
+   |         ^^^^^^^^^^^^^^^ unauthorized access to file tests_failed/include_unauthorized/../outside.hurl, check --file-root option
+   |
+

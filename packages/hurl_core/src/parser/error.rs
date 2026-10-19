@@ -40,6 +40,7 @@ pub enum ParseErrorKind {
     Filename,
     GraphQlVariables,
     HexDigit,
+    IncludeSectionName { name: String },
     InvalidCookieAttribute,
     InvalidDurationUnit(String),
     InvalidOption(String),
@@ -104,6 +105,7 @@ impl DisplaySourceError for ParseError {
             ParseErrorKind::Filename => "Parsing filename".to_string(),
             ParseErrorKind::GraphQlVariables => "Parsing GraphQL variables".to_string(),
             ParseErrorKind::HexDigit => "Parsing hexadecimal number".to_string(),
+            ParseErrorKind::IncludeSectionName { .. } => "Parsing include section name".to_string(),
             ParseErrorKind::InvalidCookieAttribute => "Parsing cookie attribute".to_string(),
             ParseErrorKind::InvalidOption(_) => "Parsing option".to_string(),
             ParseErrorKind::InvalidDurationUnit(_) => "Parsing duration".to_string(),
@@ -146,6 +148,12 @@ impl DisplaySourceError for ParseError {
                 "GraphQL variables is not a valid JSON object".to_string()
             }
             ParseErrorKind::HexDigit => "expecting a valid hexadecimal number".to_string(),
+            ParseErrorKind::IncludeSectionName { name } => {
+                let valid_values = ["Variables", "Captures"];
+                let default = format!("Valid values are {}", valid_values.join(", "));
+                let did_you_mean = did_you_mean(&valid_values, name.as_str(), &default);
+                format!("the section is not valid. {did_you_mean}")
+            }
             ParseErrorKind::InvalidCookieAttribute => {
                 "the cookie attribute is not valid".to_string()
             }

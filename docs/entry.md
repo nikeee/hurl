@@ -7,6 +7,8 @@ A Hurl file is a list of entries, each entry being a mandatory [request], option
 Responses are not mandatory, a Hurl file consisting only of requests is perfectly valid. To sum up, responses can be used
 to [capture values] to perform subsequent requests, or [add asserts to HTTP responses].
 
+An entry can also be an [include], running another Hurl file as an isolated sub-script.
+
 ## Example
 
 ```hurl
@@ -253,3 +255,4 @@ For complete reference, below is a diagram for the executed entries.
 [`redirects` query]: /docs/asserting-response.md#redirects-assert
 [`url` query]: /docs/asserting-response.md#url-assert
 [`--no-coookie-store`]: /docs/manual.md#no-cookie-store
+[include]: /docs/including-files.md

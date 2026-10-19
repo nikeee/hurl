@@ -1,0 +1,9 @@
+error: Undefined include capture
+  --> tests_failed/include_variable_not_found/include_variable_not_found.hurl:3:1
+   |
+   | INCLUDE ./child.hurl
+   | ...
+ 3 | token: exported_token
+   | ^ variable token is not defined in the included file run
+   |
+

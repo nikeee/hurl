@@ -103,6 +103,19 @@ pub enum RunnerErrorKind {
     FilterInvalidFormatSpecifier(String),
     FilterMissingInput,
     Http(HttpError),
+    /// A cycle in the included files has been detected on `path`.
+    IncludeCycle {
+        path: PathBuf,
+    },
+    /// The included file `path` is not a valid Hurl file.
+    IncludeParseError {
+        path: PathBuf,
+    },
+    /// A variable listed in the `[Captures]` section of an include is not defined at the end
+    /// of the included file run.
+    IncludeVariableNotFound {
+        name: String,
+    },
     InvalidJson {
         value: String,
     },
@@ -169,6 +182,11 @@ impl DisplaySourceError for RunnerError {
             RunnerErrorKind::FilterInvalidFormatSpecifier { .. } => "Filter error".to_string(),
             RunnerErrorKind::FilterMissingInput => "Filter error".to_string(),
             RunnerErrorKind::Http(http_error) => http_error.description(),
+            RunnerErrorKind::IncludeCycle { .. } => "Include cycle".to_string(),
+            RunnerErrorKind::IncludeParseError { .. } => "Include parse error".to_string(),
+            RunnerErrorKind::IncludeVariableNotFound { .. } => {
+                "Undefined include capture".to_string()
+            }
             RunnerErrorKind::InvalidJson { .. } => "Invalid JSON".to_string(),
             RunnerErrorKind::InvalidOptionValue { .. } => "Invalid option value".to_string(),
             RunnerErrorKind::InvalidRegex => "Invalid regex".to_string(),
@@ -299,6 +317,24 @@ impl DisplaySourceError for RunnerError {
             RunnerErrorKind::Http(http_error) => {
                 let message = http_error.message();
                 let message = error::add_carets(&message, self.source_info, content);
+                color_red_multiline_string(&message)
+            }
+            RunnerErrorKind::IncludeCycle { path } => {
+                let message = &format!(
+                    "file {} is already being run, including it creates a cycle",
+                    path.to_string_lossy()
+                );
+                let message = error::add_carets(message, self.source_info, content);
+                color_red_multiline_string(&message)
+            }
+            RunnerErrorKind::IncludeParseError { path } => {
+                let message = &format!("file {} is not a valid Hurl file", path.to_string_lossy());
+                let message = error::add_carets(message, self.source_info, content);
+                color_red_multiline_string(&message)
+            }
+            RunnerErrorKind::IncludeVariableNotFound { name } => {
+                let message = &format!("variable {name} is not defined in the included file run");
+                let message = error::add_carets(message, self.source_info, content);
                 color_red_multiline_string(&message)
             }
             RunnerErrorKind::InvalidJson { value } => {

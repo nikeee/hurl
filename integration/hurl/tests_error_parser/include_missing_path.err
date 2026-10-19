@@ -1,0 +1,7 @@
+error: Parsing space
+  --> tests_error_parser/include_missing_path.hurl:1:8
+   |
+ 1 | INCLUDE
+   |        ^ expecting a space
+   |
+

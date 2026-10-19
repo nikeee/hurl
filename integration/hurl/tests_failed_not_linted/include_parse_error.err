@@ -1,0 +1,14 @@
+error: Parsing method
+  --> tests_failed_not_linted/include_parse_error_child.hurl:1:1
+   |
+ 1 | GeT http://localhost:8000/hello
+   | ^ the HTTP method <GeT> is not valid. Did you mean GET?
+   |
+
+error: Include parse error
+  --> tests_failed_not_linted/include_parse_error.hurl:1:9
+   |
+ 1 | INCLUDE ./include_parse_error_child.hurl
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ file tests_failed_not_linted/include_parse_error_child.hurl is not a valid Hurl file
+   |
+

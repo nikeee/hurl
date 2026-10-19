@@ -15,13 +15,14 @@
  * limitations under the License.
  *
  */
+use std::path::PathBuf;
 use std::thread;
 use std::time::Instant;
 
 use chrono::Utc;
-use hurl_core::ast::{Entry, OptionKind, SourceInfo};
+use hurl_core::ast::{Entry, OptionKind, RequestEntry, SourceInfo};
 use hurl_core::error::{DisplaySourceError, OutputFormat};
-use hurl_core::input::Input;
+use hurl_core::input::{Input, InputKind};
 use hurl_core::parser;
 use hurl_core::types::{Count, Index};
 
@@ -30,6 +31,7 @@ use crate::util::logger::{ErrorFormat, Logger, LoggerOptions};
 use crate::util::term::{Stderr, Stdout, WriteMode};
 
 use super::event::EventListener;
+use super::include;
 use super::options;
 use super::result::{EntryResult, HurlResult};
 use super::runner_options::RunnerOptions;
@@ -157,6 +159,42 @@ pub fn run_entries(
     listener: Option<&dyn EventListener>,
     logger: &mut Logger,
 ) -> HurlResult {
+    // The visited stack records the canonical paths of the files being run, to detect include
+    // cycles. It's seeded with the run file (when it's a real file).
+    let mut visited = vec![];
+    if let Some(input) = filename
+        && let InputKind::File(path) = input.kind()
+        && let Ok(canonical) = std::fs::canonicalize(path)
+    {
+        visited.push(canonical);
+    }
+    run_entries_rec(
+        entries,
+        content,
+        filename,
+        runner_options,
+        variables,
+        &mut visited,
+        stdout,
+        listener,
+        logger,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+/// Runs a list of `entries` with a stack of `visited` files (for include cycle detection) and
+/// returns a [`HurlResult`] upon completion. See [`run_entries`].
+pub(crate) fn run_entries_rec(
+    entries: &[Entry],
+    content: &str,
+    filename: Option<&Input>,
+    runner_options: &RunnerOptions,
+    variables: &VariableSet,
+    visited: &mut Vec<PathBuf>,
+    stdout: &mut Stdout,
+    listener: Option<&dyn EventListener>,
+    logger: &mut Logger,
+) -> HurlResult {
     // Early returns for empty entries.
     if entries.is_empty() {
         return HurlResult {
@@ -187,7 +225,39 @@ pub fn run_entries(
         if current > last {
             break;
         }
-        let entry = &entries[current.to_zero_based()];
+        let entry = match &entries[current.to_zero_based()] {
+            Entry::Request(entry) => entry,
+            // Includes are executed in a dedicated path: the included file entries are run in an
+            // isolated environment, results are flattened into this run results.
+            Entry::Include(include) => {
+                logger.verbosity = default_verbosity;
+                log_run_entry(current, logger);
+                if let Some(listener) = listener {
+                    listener.on_entry_running(current, last, 0);
+                }
+                let (results, success) = include::run_include(
+                    include,
+                    current,
+                    filename,
+                    runner_options,
+                    &mut variables,
+                    visited,
+                    stdout,
+                    logger,
+                );
+                for result in &results {
+                    if !result.errors.is_empty() && result.source.is_none() {
+                        log_errors(result, content, filename, false, logger);
+                    }
+                }
+                entries_result.extend(results);
+                if !success && !runner_options.continue_on_error {
+                    break;
+                }
+                current += 1;
+                continue;
+            }
+        };
 
         // We compute the new logger verbosity for this entry, before entering into the `run`
         // function because entry options can modify the logger verbosity and we want the preamble
@@ -322,7 +392,7 @@ pub fn run_entries(
 /// `current` is the current index of the entry run, `last` is the index of the last entry to be run
 #[allow(clippy::too_many_arguments)]
 fn run_request(
-    entry: &Entry,
+    entry: &RequestEntry,
     current: Index,
     last: Index,
     content: &str,
@@ -433,7 +503,7 @@ fn run_request(
 /// to print a rich error (assert like) and `entry_result` errors are appended.
 #[allow(clippy::too_many_arguments)]
 fn write_entry_response(
-    entry: &Entry,
+    entry: &RequestEntry,
     entry_result: &mut EntryResult,
     output: &Output,
     options: &RunnerOptions,
@@ -471,7 +541,7 @@ fn write_entry_response(
 }
 
 /// Use source_info from output option if this option has been defined
-fn get_output_source_info(entry: &Entry) -> SourceInfo {
+fn get_output_source_info(entry: &RequestEntry) -> SourceInfo {
     let mut source_info = entry.source_info();
     for option_entry in entry.request.options() {
         if let OptionKind::Output(value) = &option_entry.kind {
@@ -500,7 +570,9 @@ fn is_success(entries: &[EntryResult]) -> bool {
         match next_entries.next() {
             None => return entry.errors.is_empty(),
             Some(next) => {
-                if next.entry_index != entry.entry_index && !entry.errors.is_empty() {
+                if (next.entry_index != entry.entry_index || next.source != entry.source)
+                    && !entry.errors.is_empty()
+                {
                     return false;
                 }
             }
@@ -611,6 +683,10 @@ fn log_errors(
     retry: bool,
     logger: &mut Logger,
 ) {
+    // Errors of an entry coming from an included file are rendered against the included
+    // file content.
+    let (content, filename) = entry_result.source_content(content, filename);
+
     if retry {
         entry_result.errors.iter().for_each(|error| {
             logger.debug_error(content, filename, error, entry_result.source_info);

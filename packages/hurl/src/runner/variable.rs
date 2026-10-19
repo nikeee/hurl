@@ -130,6 +130,16 @@ impl VariableSet {
     pub fn secrets(&self) -> Vec<String> {
         self.secrets.iter().cloned().collect::<Vec<_>>()
     }
+
+    /// Extends the secret values of this variable set with `values`.
+    ///
+    /// Contrary to [`VariableSet::insert_secret`], no variable is declared: the values are only
+    /// registered for redaction. This is used to propagate secret values between a Hurl file and
+    /// its included files, so a secret value is redacted on both sides even when the variable
+    /// holding it is not defined.
+    pub fn extend_secret_values(&mut self, values: impl IntoIterator<Item = String>) {
+        self.secrets.extend(values);
+    }
 }
 
 #[cfg(test)]
@@ -241,5 +251,34 @@ mod test {
         let mut secrets = variables.secrets();
         secrets.sort();
         assert_eq!(secrets, vec!["1234", "42"]);
+    }
+}
+
+#[cfg(test)]
+mod secret_tests {
+    use crate::runner::{Value, VariableSet};
+
+    #[test]
+    fn extend_secret_values_registers_redactions_without_declaring_variables() {
+        let mut variables = VariableSet::new();
+        variables.insert_secret("token".to_string(), "abcd".to_string());
+
+        let mut child = VariableSet::new();
+        child.extend_secret_values(variables.secrets());
+
+        // The secret value is registered for redaction, but no variable is declared.
+        assert!(child.secrets().contains(&"abcd".to_string()));
+        assert!(child.get("token").is_none());
+
+        // Merging back child secrets keeps previous parent secrets.
+        child.insert_secret("child_token".to_string(), "efgh".to_string());
+        variables.extend_secret_values(child.secrets());
+        let mut secrets = variables.secrets();
+        secrets.sort();
+        assert_eq!(secrets, vec!["abcd".to_string(), "efgh".to_string()]);
+
+        // The value is a public value in the child set.
+        child.insert("public".to_string(), Value::String("hello".to_string()));
+        assert!(!child.get("public").unwrap().is_secret());
     }
 }

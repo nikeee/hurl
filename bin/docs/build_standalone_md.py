@@ -253,6 +253,7 @@ def main() -> int:
             "docs/asserting-response.md",
             "docs/filters.md",
             "docs/templates.md",
+            "docs/including-files.md",
             "docs/grammar.md",
         ],
     )
