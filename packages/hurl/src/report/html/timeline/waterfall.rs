@@ -472,9 +472,11 @@ fn new_call_tooltip(
     legend.add_child(elt);
 
     // Source URL
-    let href = format!("{}#l{}", call_ctx.source_filename, call_ctx.line);
-    let elt = new_link(x + 90.px(), y, "(view source)", &href);
-    legend.add_child(elt);
+    if let Some(source_filename) = &call_ctx.source_filename {
+        let href = format!("{}#l{}", source_filename, call_ctx.line);
+        let elt = new_link(x + 90.px(), y, "(view source)", &href);
+        legend.add_child(elt);
+    }
 
     // Timings explanation
     y += delta_y;

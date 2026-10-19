@@ -73,7 +73,7 @@ impl HurlResult {
                     errors.extend(new_errors);
                 }
                 Some(next) => {
-                    if next.entry_index != entry.entry_index || next.source != entry.source {
+                    if !next.is_same_entry(entry) {
                         let new_errors = entry
                             .errors
                             .iter()
@@ -129,6 +129,22 @@ pub struct EntryResult {
 }
 
 impl EntryResult {
+    /// Returns true if `other` is a result of the same entry as this result (for instance a
+    /// retry of this entry), false otherwise.
+    ///
+    /// Two results are from the same entry when they have the same entry index and come from
+    /// the same source file. The source is compared by identity, not by value: two consecutive
+    /// includes of the same file produce results with equal source values but from different
+    /// include runs, and a failure of the first run must not be taken for a retry of the second.
+    pub fn is_same_entry(&self, other: &EntryResult) -> bool {
+        self.entry_index == other.entry_index
+            && match (&self.source, &other.source) {
+                (None, None) => true,
+                (Some(source), Some(other)) => Arc::ptr_eq(source, other),
+                _ => false,
+            }
+    }
+
     /// Returns the source content and filename against which errors of this entry should be
     /// rendered: the entry's own source file if it comes from an included file, or the given
     /// default content and filename (the file of the run) otherwise.
@@ -366,14 +382,23 @@ mod tests {
             filename: Input::new("child.hurl"),
             content: "GET http://foo".to_string(),
         });
+        // Same file included a second time: equal value, distinct include run.
+        let included_again = Arc::new(EntrySource {
+            filename: Input::new("child.hurl"),
+            content: "GET http://foo".to_string(),
+        });
+        assert_eq!(included, included_again);
 
         // Entry 1 is retried (same index, same source): only the last error is effective.
         // The included entry has the same index as the parent entry, but a different source:
-        // its error must not be considered as a retry of the parent entry.
+        // its error must not be considered as a retry of the parent entry. The second include
+        // run of the same file has the same index and an equal source value, but is not a
+        // retry either: the first include run error must be kept.
         let entries = vec![
             entry(1, None, vec![error_at(1)]),
             entry(1, None, vec![error_at(1)]),
             entry(1, Some(included.clone()), vec![error_at(2)]),
+            entry(1, Some(included_again.clone()), vec![error_at(3)]),
             entry(2, None, vec![]),
         ];
         let result = HurlResult {
@@ -381,9 +406,12 @@ mod tests {
             ..Default::default()
         };
         let errors = result.errors();
-        assert_eq!(errors.len(), 2);
+        assert_eq!(errors.len(), 3);
         assert!(errors[0].2.is_none());
-        assert_eq!(errors[1].2, Some(&included));
+        assert!(Arc::ptr_eq(errors[1].2.unwrap(), &included));
+        assert_eq!(errors[1].0.source_info.start.line, 2);
+        assert!(Arc::ptr_eq(errors[2].2.unwrap(), &included_again));
+        assert_eq!(errors[2].0.source_info.start.line, 3);
     }
 
     #[test]

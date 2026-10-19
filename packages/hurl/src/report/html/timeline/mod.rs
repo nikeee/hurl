@@ -47,7 +47,7 @@ pub struct CallContext {
     pub entry_index: Index,    // Index of the runtime EntryResult
     pub call_entry_index: Index, // Index of the runtime Call in the current entry
     pub call_index: Index,     // Index of the runtime Call in the whole run
-    pub source_filename: String,
+    pub source_filename: Option<String>, // None if the entry comes from an included file
     pub run_filename: String,
 }
 
@@ -91,13 +91,16 @@ impl Testcase {
             let next_e = entries.get(entry_index + 1);
             let retry = match next_e {
                 None => false, // last entry of the whole run can't be retried
-                Some(next_e) => e.entry_index == next_e.entry_index && e.source == next_e.source,
+                Some(next_e) => e.is_same_entry(next_e),
             };
             let kind = match (e.errors.is_empty(), retry) {
                 (true, _) => CallContextKind::Success,
                 (false, true) => CallContextKind::Retry,
                 (false, false) => CallContextKind::Failure,
             };
+            // Only the run file has a source view: entries coming from an included file have
+            // line numbers relative to the included file and are not linked to it.
+            let source_filename = e.source.is_none().then(|| self.source_filename());
             for (call_entry_index, _) in e.calls.iter().enumerate() {
                 let line = Index::new(e.source_info.start.line);
                 let ctx = CallContext {
@@ -106,7 +109,7 @@ impl Testcase {
                     entry_index: Index::from_zero_based(entry_index),
                     call_entry_index: Index::from_zero_based(call_entry_index),
                     call_index: Index::from_zero_based(calls_ctx.len()),
-                    source_filename: self.source_filename(),
+                    source_filename: source_filename.clone(),
                     run_filename: self.run_filename(),
                 };
                 calls_ctx.push(ctx);

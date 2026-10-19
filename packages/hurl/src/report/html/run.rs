@@ -32,7 +32,12 @@ impl Testcase {
         let mut run = String::new();
         for (entry_index, e) in entries.iter().enumerate() {
             let line = e.source_info.start.line;
-            let source = self.source_filename();
+            // Only the run file has a source view: entries coming from an included file have
+            // line numbers relative to the included file and are not linked to it.
+            let (filename, source) = match &e.source {
+                Some(source) => (source.filename.to_string().html_escape(), None),
+                None => (self.safe_filename(), Some(self.source_filename())),
+            };
 
             run.push_str("<details open>");
             let info = get_entry_html(e, entry_index + 1, secrets);
@@ -43,8 +48,8 @@ impl Testcase {
                     c,
                     entry_index + 1,
                     call_index + 1,
-                    &self.safe_filename(),
-                    &source,
+                    &filename,
+                    source.as_deref(),
                     line,
                     secrets,
                 );
@@ -99,7 +104,7 @@ fn get_call_html(
     entry_index: usize,
     call_index: usize,
     filename: &str,
-    source: &str,
+    source: Option<&str>,
     line: usize,
     secrets: &[&str],
 ) -> String {
@@ -112,7 +117,10 @@ fn get_call_html(
     let version = call.response.version.to_string();
     let url = &call.request.url.to_string().redact(secrets).html_escape();
     let url = format!("<a href=\"{url}\">{url}</a>");
-    let source = format!("<a href=\"{source}#l{line}\">{filename}:{line}</a>");
+    let source = match source {
+        Some(source) => format!("<a href=\"{source}#l{line}\">{filename}:{line}</a>"),
+        None => format!("{filename}:{line}"),
+    };
     let start_date = call.timings.begin_call.to_rfc2822();
     let values = vec![
         ("Start Date", start_date.as_str()),

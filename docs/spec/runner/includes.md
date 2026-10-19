@@ -23,16 +23,18 @@ An include is an entry of the including file. When the runner main loop (`run_en
 2. resolves the path relatively to the including file's directory (the current working directory
    when the including file is standard input),
 3. checks that the resolved path stays under the file root of the run (`ContextDir`, same
-   sandbox as `file,...` bodies and `output`),
+   sandbox as `file,...` bodies and `output`; like them, the check is lexical, symbolic links
+   are not resolved),
 4. canonicalizes the path and checks it against the stack of files currently being run (cycle
    detection, see below),
 5. reads and parses the included file — a parse error is rendered against the included file
    content, then reported as an `IncludeParseError` on the include line,
 6. builds the included file's variable set (isolation, see below),
 7. recursively calls `run_entries_rec` on the included file's entries, with a child
-   `RunnerOptions` (cleared `from_entry`/`to_entry`, `ContextDir` rooted at the included file's
-   directory) — a new HTTP client, hence a fresh cookie jar, is created per `run_entries_rec`
-   call,
+   `RunnerOptions` (the run options with cleared `from_entry`/`to_entry`; the `ContextDir` of
+   the run is kept, so `file,...` bodies and `output` of the included file are resolved against
+   the file root of the run, and nested includes are checked against it) — a new HTTP client,
+   hence a fresh cookie jar, is created per `run_entries_rec` call,
 8. flattens the included run's entry results into the including run's results, tagging each of
    them with the included file source (see reporting below),
 9. exports the captures listed on the include back to the including file's variables.
@@ -82,11 +84,13 @@ with their file (entries of nested includes are tagged once, at the innermost le
 as-is by outer levels).
 
 All error rendering and reports select the content/filename per entry (`EntryResult::
-source_content`): stderr messages, HTML report (errors from included files are listed but not
-line-linked into the run file source view), JSON report (`entries[].filename` is set for
-included entries), JUnit failures. Retry deduplication (`HurlResult::errors`, `is_success`)
-compares `(entry_index, source)` since child-local indices can collide with parent indices after
-flattening.
+source_content`): stderr messages, HTML report (errors, run and timeline views show the included
+file name and line, but are not line-linked into the run file source view, which only displays
+the run file), JSON report (`entries[].filename` is set for included entries), JUnit failures.
+Retry deduplication (`HurlResult::errors`, `is_success`, `EntryResult::is_same_entry`) compares
+`(entry_index, source)` since child-local indices can collide with parent indices after
+flattening; the source is compared by identity (`Arc::ptr_eq`), as two consecutive includes of
+the same file produce equal source values from different runs.
 
 The default standard output (the body of the last response of the run, see `output::write_last_body`)
 follows the flattened results too: when an include is the last entry of the run file, the body
@@ -95,6 +99,7 @@ written is the one of the last response of the included file.
 ## Interaction with options
 
 An include has no `[Options]` section: `retry`, `repeat`, `delay`, `skip` don't apply to the
-include itself. `--from-entry`/`--to-entry` count an include as one entry of the including file
+include itself. The run options (CLI options like `--retry`, `--cookie`, `--insecure`...) apply
+to the included file requests as to any request of the run. `--from-entry`/`--to-entry` count an include as one entry of the including file
 and are not forwarded into the child run (the included file always runs entirely). The `--test`
 progress listener reports at the including file's entry granularity.

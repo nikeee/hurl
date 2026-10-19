@@ -1,0 +1,10 @@
+error: Assert failure
+  --> tests_failed/include_continue_on_error/child.hurl:4:0
+   |
+   | GET http://localhost:8000/hello
+   | ...
+ 4 | status == {{expected}}
+   |   actual:   integer <200>
+   |   expected: integer <500>
+   |
+

@@ -570,9 +570,7 @@ fn is_success(entries: &[EntryResult]) -> bool {
         match next_entries.next() {
             None => return entry.errors.is_empty(),
             Some(next) => {
-                if (next.entry_index != entry.entry_index || next.source != entry.source)
-                    && !entry.errors.is_empty()
-                {
+                if !next.is_same_entry(entry) && !entry.errors.is_empty() {
                     return false;
                 }
             }

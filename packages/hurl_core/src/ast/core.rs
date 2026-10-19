@@ -43,11 +43,13 @@ pub enum Entry {
 }
 
 impl Entry {
-    /// Returns the source information for this entry.
+    /// Returns the source information for this entry: the source information of the method line
+    /// for a request, of the `INCLUDE` line for an include (leading blank lines and comments are
+    /// not part of it).
     pub fn source_info(&self) -> SourceInfo {
         match self {
             Entry::Request(entry) => entry.source_info(),
-            Entry::Include(entry) => entry.source_info,
+            Entry::Include(entry) => entry.space0.source_info,
         }
     }
 

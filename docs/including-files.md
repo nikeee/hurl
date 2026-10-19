@@ -56,7 +56,9 @@ INCLUDE ./fragments/{{scenario}}.hurl
 ```
 
 Like any file access in Hurl, the included file must stay under the file root of the run (by
-default the directory of the run file, configurable with [`--file-root`]).
+default the directory of the run file, configurable with [`--file-root`]). File bodies
+(`file,data.txt;`) and outputs of an included file are resolved against the file root of the run
+too, like in any Hurl file.
 
 ## Isolation
 
@@ -74,6 +76,9 @@ exported to the including file.
 This makes the included file a function-like unit: what goes in and out is entirely explicit. In
 particular, two includes of the same login file don't overwrite each other's session cookies:
 session values are passed around explicitly through captures.
+
+Command line options (like [`--retry`], [`--insecure`] or [`--cookie`]) apply to the requests of
+the included file as to any request of the run.
 
 ### Passing variables in
 
@@ -161,4 +166,7 @@ file: the included file always runs entirely.
 [redacted capture]: /docs/capturing-response.md#redacting-secrets
 [HTML, JSON, JUnit and TAP reports]: /docs/running-tests.md#generating-report
 [`--file-root`]: /docs/manual.md#file-root
+[`--retry`]: /docs/manual.md#retry
+[`--insecure`]: /docs/manual.md#insecure
+[`--cookie`]: /docs/manual.md#cookie
 [`--from-entry` and `--to-entry`]: /docs/manual.md#from-entry

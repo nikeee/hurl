@@ -26,7 +26,6 @@ use hurl_core::parser;
 use hurl_core::types::Index;
 
 use crate::util::logger::Logger;
-use crate::util::path::ContextDir;
 use crate::util::term::Stdout;
 
 use super::error::{RunnerError, RunnerErrorKind};
@@ -155,28 +154,29 @@ pub fn run_include(
     // only sees the variables of the `[Variables]` section, evaluated in the including file's
     // environment. Parent secret values are propagated so they stay redacted in the included
     // file logs.
+    let parent_secrets = variables.secrets();
     let mut child_variables = VariableSet::new();
-    child_variables.extend_secret_values(variables.secrets());
+    child_variables.extend_secret_values(parent_secrets.clone());
     for variable in include.variables() {
         let value = match eval_variable_value(&variable.value, variables) {
             Ok(value) => value,
             Err(error) => return error_result(error),
         };
         match &value {
-            Value::String(s) if variables.secrets().contains(s) => {
+            Value::String(s) if parent_secrets.contains(s) => {
                 child_variables.insert_secret(variable.name.clone(), s.clone());
             }
             _ => child_variables.insert(variable.name.clone(), value),
         }
     }
 
-    // The included file gets its own context directory: its file accesses and nested includes
-    // are relative to its own directory (which is inside the file root of the run).
+    // The included file runs with the options of the run, except for the entries range: the
+    // included file is always run entirely. In particular, the context directory of the run is
+    // kept: file bodies and outputs of the included file are resolved against the file root of
+    // the run, like any file access.
     let mut child_options = runner_options.clone();
     child_options.from_entry = None;
     child_options.to_entry = None;
-    let child_dir = resolved.parent().map(Path::to_path_buf).unwrap_or_default();
-    child_options.context_dir = ContextDir::new(context_dir.current_dir(), &child_dir);
 
     logger.debug_important(&format!("Including file {child_input}"));
     logger.set_secrets(child_variables.secrets());
@@ -196,6 +196,12 @@ pub fn run_include(
         logger,
     );
     visited.pop();
+
+    if child_result.entries.is_empty() {
+        logger.warning(&format!(
+            "No entry have been executed for file {child_input}"
+        ));
+    }
 
     // Tags the entry results with the included file source, so errors and reports point to the
     // included file. Entries of deeper includes are already tagged.
